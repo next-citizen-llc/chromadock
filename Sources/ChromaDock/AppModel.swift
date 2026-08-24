@@ -417,10 +417,19 @@ final class AppModel: ObservableObject {
             throw DockApplyError.emptyScan
         }
         var byBundle: [String: [String: Any]] = [:]
+        var spacersAfter: [String: [[String: Any]]] = [:]
+        var lastBundle: String?
         for tile in current {
+            if DockIO.isNativeSpacer(tile) {
+                if let lastBundle {
+                    spacersAfter[lastBundle, default: []].append(tile)
+                }
+                continue
+            }
             if DockIO.isDividerTile(tile) { continue }
             if let b = DockIO.bundleID(of: tile) {
                 byBundle[b] = tile
+                lastBundle = b
             }
         }
 
@@ -449,6 +458,9 @@ final class AppModel: ObservableObject {
                         label: app.label,
                         path: app.path
                     ))
+                }
+                if let spacers = spacersAfter[app.bundleIdentifier] {
+                    newApps.append(contentsOf: spacers)
                 }
             }
         }
