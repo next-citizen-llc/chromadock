@@ -150,9 +150,7 @@ final class AppModel: ObservableObject {
         defer { isBusy = false }
         let snapshot = (settings: settings, apps: apps)
         do {
-            let backup = try await Task.detached(priority: .userInitiated) {
-                try Self.applyArrangement(settings: snapshot.settings, apps: snapshot.apps)
-            }.value
+            let backup = try await Self.applyArrangement(settings: snapshot.settings, apps: snapshot.apps)
             lastBackupURL = backup
             status = "Dock updated. Backup saved."
             await refreshAsync()
@@ -432,7 +430,7 @@ final class AppModel: ObservableObject {
         return newApps
     }
 
-    nonisolated static func applyArrangement(settings: AppSettings, apps: [DockApp]) throws -> URL {
+    nonisolated static func applyArrangement(settings: AppSettings, apps: [DockApp]) async throws -> URL {
         let dict = try DockIO.exportPlist()
         let backup = try DockIO.writeBackup(dict)
         let current = DockIO.persistentApps(dict)
@@ -455,8 +453,8 @@ final class AppModel: ObservableObject {
         next["persistent-apps"] = newApps
         try DockIO.importPlist(next)
         if settings.insertDividers && settings.keepDividersRunning {
-            Thread.sleep(forTimeInterval: 1.6)
-            DispatchQueue.main.async {
+            try await Task.sleep(nanoseconds: 1_600_000_000)
+            await MainActor.run {
                 DividerManager.launchHelpers(helperURLs)
             }
         } else {
