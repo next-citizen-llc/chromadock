@@ -94,6 +94,10 @@ glass plate. The working approach:
 - **Keep lines drawn** relaunches those helpers after Apply, at login, and if
   a helper is quit (immediate relaunch plus a LaunchAgent so the tile stays
   a running hairline instead of falling back to an app-icon squircle).
+- **Create** on the Separators picker is for future paid marks. It opens a
+  dialog with subject `ChromaDock Interest` and a short editable note, then a
+  link to the [nextcz.com](https://nextcz.com/) contact form. The form is the
+  same GoDaddy widget as the website; only email still has to be typed.
 
 Open at login (optional) relaunches ChromaDock so it can start those helpers
 again after a reboot.
@@ -102,9 +106,10 @@ again after a reboot.
 
 ## Privacy
 
-ChromaDock runs entirely on your Mac. It reads Dock preferences and app icons,
-writes a local backup of `com.apple.dock`, and launches local helper apps. It
-does not open a network connection.
+ChromaDock runs on your Mac. It reads Dock preferences and app icons, writes a
+local backup of `com.apple.dock`, and launches local helper apps. The only
+network use is optional: **Create** can open the nextcz.com contact form so an
+interest note registers the same way as other site inquiries.
 
 ---
 

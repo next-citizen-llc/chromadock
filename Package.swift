@@ -11,7 +11,7 @@ let package = Package(
         .target(
             name: "ChromaDockCore",
             path: "Sources/ChromaDock",
-            exclude: ["main.swift", "App.swift", "ContentView.swift"],
+            exclude: ["main.swift", "App.swift", "ContentView.swift", "ContactInterestView.swift"],
             linkerSettings: [
                 .linkedFramework("AppKit"),
                 .linkedFramework("ImageIO"),
