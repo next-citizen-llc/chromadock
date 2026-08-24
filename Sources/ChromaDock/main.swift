@@ -25,7 +25,6 @@ if args.contains("--apply") || args.contains("--restore") || args.contains("--sc
         if args.contains("--restore") {
             failed = !(await model.restoreAsync())
         } else if args.contains("--apply") {
-            await model.refreshAsync()
             failed = !(await model.applyAsync())
         } else {
             await model.refreshAsync()

@@ -32,10 +32,10 @@ final class AppModel: ObservableObject {
         Task { await refreshAsync() }
     }
 
-    func refreshAsync() async {
-        isBusy = true
+    func refreshAsync(updateBusy: Bool = true) async {
+        if updateBusy { isBusy = true }
         status = "Reading Dock icons…"
-        defer { isBusy = false }
+        defer { if updateBusy { isBusy = false } }
         let settings = self.settings
         do {
             let packed = try await Task.detached(priority: .userInitiated) {
@@ -148,6 +148,7 @@ final class AppModel: ObservableObject {
         isBusy = true
         status = "Applying Dock arrangement…"
         defer { isBusy = false }
+        await refreshAsync(updateBusy: false)
         let snapshot = (settings: settings, apps: apps)
         do {
             let outcome = try await Self.applyArrangement(settings: snapshot.settings, apps: snapshot.apps)
@@ -488,6 +489,20 @@ final class AppModel: ObservableObject {
                 if let spacers = spacersAfter[app.bundleIdentifier] {
                     newApps.append(contentsOf: spacers)
                 }
+            }
+        }
+
+        var emitted = Set(newApps.compactMap { tile -> String? in
+            if DockIO.isDividerTile(tile) || DockIO.isNativeSpacer(tile) { return nil }
+            return DockIO.bundleID(of: tile)
+        })
+        for tile in current {
+            if DockIO.isDividerTile(tile) || DockIO.isNativeSpacer(tile) { continue }
+            guard let bundle = DockIO.bundleID(of: tile), !emitted.contains(bundle) else { continue }
+            newApps.append(tile)
+            emitted.insert(bundle)
+            if let spacers = spacersAfter[bundle] {
+                newApps.append(contentsOf: spacers)
             }
         }
 

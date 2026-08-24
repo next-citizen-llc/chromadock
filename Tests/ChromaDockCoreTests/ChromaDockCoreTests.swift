@@ -159,6 +159,24 @@ final class BuildPersistentAppsTests: XCTestCase {
         XCTAssertEqual(DockIO.bundleID(of: built[3]), "com.tinyspeck.slackmacgap")
     }
 
+    func testUnscannedDockedAppIsKept() throws {
+        let slack = fixtureApp(label: "Slack", bundle: "com.tinyspeck.slackmacgap", group: "communication", inDock: true)
+        let current = [
+            fileTile(bundle: "com.apple.Safari", label: "Safari"),
+            fileTile(bundle: "com.tinyspeck.slackmacgap", label: "Slack")
+        ]
+        var settings = AppSettings.default
+        settings.insertDividers = false
+        let built = try AppModel.buildPersistentApps(
+            settings: settings,
+            apps: [slack],
+            current: current,
+            helperURLs: []
+        )
+        XCTAssertEqual(DockIO.bundleID(of: built[0]), "com.tinyspeck.slackmacgap")
+        XCTAssertEqual(DockIO.bundleID(of: built[1]), "com.apple.Safari")
+    }
+
     func testTwoDockedGroupsGetOneDivider() throws {
         let safari = fixtureApp(label: "Safari", bundle: "com.apple.Safari", group: "browsers", inDock: true)
         let slack = fixtureApp(label: "Slack", bundle: "com.tinyspeck.slackmacgap", group: "communication", inDock: true)
