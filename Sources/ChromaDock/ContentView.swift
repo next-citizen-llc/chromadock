@@ -6,7 +6,10 @@ struct ContentView: View {
     @State private var selectedGroup: String?
     @State private var renamingGroupID: String?
     @State private var appQuery = ""
+    @State private var renameDraft = ""
+    @State private var groupTitleDraft = ""
     @FocusState private var focusedRenameID: String?
+    @FocusState private var groupNameFocused: Bool
 
     var body: some View {
         NavigationSplitView {
@@ -81,14 +84,26 @@ struct ContentView: View {
             if selectedGroup == nil {
                 selectedGroup = model.settings.groups.first?.id
             }
+            groupTitleDraft = model.settings.groups.first(where: { $0.id == selectedGroup })?.title ?? ""
         }
         .onChange(of: selectedGroup) { _, new in
             if let renamingGroupID, renamingGroupID != new {
-                self.renamingGroupID = nil
+                commitSidebarRename()
             }
+            groupTitleDraft = model.settings.groups.first(where: { $0.id == new })?.title ?? ""
         }
         .onChange(of: renamingGroupID) { _, id in
             focusedRenameID = id
+        }
+        .onChange(of: focusedRenameID) { old, new in
+            if new == nil, old != nil {
+                commitSidebarRename()
+            }
+        }
+        .onChange(of: groupNameFocused) { _, focused in
+            if !focused {
+                commitGroupTitle()
+            }
         }
         .frame(minWidth: 760, minHeight: 480)
     }
@@ -98,13 +113,10 @@ struct ContentView: View {
         let count = model.apps.filter { $0.groupID == group.id }.count
         HStack {
             if renamingGroupID == group.id {
-                TextField("Group name", text: Binding(
-                    get: { group.title },
-                    set: { model.renameGroup(group.id, title: $0) }
-                ))
+                TextField("Group name", text: $renameDraft)
                 .textFieldStyle(.roundedBorder)
                 .focused($focusedRenameID, equals: group.id)
-                .onSubmit { renamingGroupID = nil }
+                .onSubmit { commitSidebarRename() }
                 .onExitCommand { renamingGroupID = nil }
             } else {
                 Text(group.title)
@@ -119,12 +131,30 @@ struct ContentView: View {
     private func createGroup(after id: String? = nil) {
         let newID = model.addGroup(after: id)
         selectedGroup = newID
+        renameDraft = "New Group"
+        groupTitleDraft = "New Group"
         renamingGroupID = newID
     }
 
     private func beginRename(_ id: String) {
         selectedGroup = id
+        renameDraft = model.settings.groups.first(where: { $0.id == id })?.title ?? ""
         renamingGroupID = id
+    }
+
+    private func commitSidebarRename() {
+        if let id = renamingGroupID {
+            model.renameGroup(id, title: renameDraft)
+            if id == selectedGroup {
+                groupTitleDraft = renameDraft
+            }
+        }
+        renamingGroupID = nil
+    }
+
+    private func commitGroupTitle() {
+        guard let id = selectedGroup else { return }
+        model.renameGroup(id, title: groupTitleDraft)
     }
 
     private func deleteGroup(_ id: String) {
@@ -214,12 +244,11 @@ struct ContentView: View {
 
     private func groupNameBar(_ group: DockGroup) -> some View {
         HStack {
-            TextField("Group name", text: Binding(
-                get: { group.title },
-                set: { model.renameGroup(group.id, title: $0) }
-            ))
+            TextField("Group name", text: $groupTitleDraft)
             .textFieldStyle(.roundedBorder)
             .frame(maxWidth: 280)
+            .focused($groupNameFocused)
+            .onSubmit { commitGroupTitle() }
             Spacer()
         }
         .padding(.horizontal, 12)
