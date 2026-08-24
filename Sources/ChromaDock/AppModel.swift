@@ -37,21 +37,34 @@ final class AppModel: ObservableObject {
         defer { isBusy = false }
         let settings = self.settings
         do {
-            let dockRows = try await Task.detached(priority: .userInitiated) {
+            let packed = try await Task.detached(priority: .userInitiated) {
                 let dict = try DockIO.exportPlist()
-                return Self.dockRows(from: dict, settings: settings)
+                let dock = Self.dockRows(from: dict, settings: settings)
+                let agents = Self.agentRows(existingBundles: Set(dock.map(\.bundle)), settings: settings)
+                return (dock: dock, agents: agents)
             }.value
-            let extras = Self.extraRows(
-                existingBundles: Set(dockRows.map(\.bundle)),
+            let running = Self.runningAppRows(
+                existingBundles: Set(packed.dock.map(\.bundle) + packed.agents.map(\.bundle)),
                 settings: settings
             )
-            let rows = dockRows + extras
+            let runningBundles = Set(running.map(\.bundle))
+            let extras = running + packed.agents.filter { !runningBundles.contains($0.bundle) }
+            let rows = packed.dock + extras
+            var rasters: [HueSampler.Raster?] = []
+            rasters.reserveCapacity(rows.count)
+            for (index, row) in rows.enumerated() {
+                if index == 0 || (index + 1) % 10 == 0 || index + 1 == rows.count {
+                    status = "Reading \(row.label)… (\(index + 1)/\(rows.count))"
+                }
+                rasters.append(HueSampler.rasterize(path: row.path))
+                if (index + 1) % 10 == 0 { await Task.yield() }
+            }
+            let samples = await Task.detached(priority: .userInitiated) {
+                rasters.map { $0.flatMap(HueSampler.analyze) }
+            }.value
             var scanned: [DockApp] = []
             scanned.reserveCapacity(rows.count)
-            for (index, row) in rows.enumerated() {
-                status = "Reading \(row.label)… (\(index + 1)/\(rows.count))"
-                await Task.yield()
-                let sample = HueSampler.rasterize(path: row.path).flatMap(HueSampler.analyze)
+            for (row, sample) in zip(rows, samples) {
                 scanned.append(DockApp(
                     label: row.label,
                     bundleIdentifier: row.bundle,
@@ -240,26 +253,34 @@ final class AppModel: ObservableObject {
     }
 
     @MainActor
-    private static func extraRows(existingBundles: Set<String>, settings: AppSettings) -> [DockRow] {
+    private static func runningAppRows(existingBundles: Set<String>, settings: AppSettings) -> [DockRow] {
         var seen = existingBundles
         var extras: [DockRow] = []
-        func consider(bundle: String, label: String, path: String) {
-            guard !bundle.isEmpty, !seen.contains(bundle) else { return }
-            guard !shouldSkipExtra(bundle: bundle, path: path) else { return }
-            seen.insert(bundle)
-            let group = settings.assignments[bundle]
-                ?? Heuristic.suggestedGroup(bundle: bundle, label: label)
-            extras.append(DockRow(label: label, bundle: bundle, path: path, groupID: group, inDock: false))
-        }
-
         for app in NSWorkspace.shared.runningApplications {
             guard app.activationPolicy == .regular else { continue }
             guard let bundle = app.bundleIdentifier, let url = app.bundleURL else { continue }
-            consider(bundle: bundle, label: app.localizedName ?? bundle, path: url.path)
+            guard !bundle.isEmpty, !seen.contains(bundle) else { continue }
+            guard !shouldSkipExtra(bundle: bundle, path: url.path) else { continue }
+            seen.insert(bundle)
+            let label = app.localizedName ?? bundle
+            let group = settings.assignments[bundle]
+                ?? Heuristic.suggestedGroup(bundle: bundle, label: label)
+            extras.append(DockRow(label: label, bundle: bundle, path: url.path, groupID: group, inDock: false))
         }
+        return extras
+    }
+
+    nonisolated private static func agentRows(existingBundles: Set<String>, settings: AppSettings) -> [DockRow] {
+        var seen = existingBundles
+        var extras: [DockRow] = []
         for agent in launchAgentApps() {
             guard isUserAppPath(agent.path) else { continue }
-            consider(bundle: agent.bundle, label: agent.label, path: agent.path)
+            guard !agent.bundle.isEmpty, !seen.contains(agent.bundle) else { continue }
+            guard !shouldSkipExtra(bundle: agent.bundle, path: agent.path) else { continue }
+            seen.insert(agent.bundle)
+            let group = settings.assignments[agent.bundle]
+                ?? Heuristic.suggestedGroup(bundle: agent.bundle, label: agent.label)
+            extras.append(DockRow(label: agent.label, bundle: agent.bundle, path: agent.path, groupID: group, inDock: false))
         }
         return extras
     }
