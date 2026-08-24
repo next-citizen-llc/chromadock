@@ -1,8 +1,7 @@
 import AppKit
 
-/// Transparent Dock tile: draws only a vertical chrome line so the Dock glass
-/// shows through. Must run as a regular app (not LSUIElement) for the Dock
-/// to bind `NSDockTile.contentView` to the kept-in-Dock icon.
+/// Transparent Dock tile: a Trash-style chrome hairline. Bind `contentView`
+/// while regular, then switch to accessory so the running-app dot is not shown.
 final class LineView: NSView {
     override var isOpaque: Bool { false }
     override var wantsDefaultClipping: Bool { false }
@@ -10,18 +9,32 @@ final class LineView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         NSColor.clear.setFill()
         bounds.fill()
-        let w = max(2.0, min(4.0, bounds.width * 0.045))
-        let x = (bounds.width - w) / 2
-        let inset = bounds.height * 0.05
-        let rect = NSRect(x: x, y: inset, width: w, height: bounds.height - inset * 2)
-        NSColor(calibratedWhite: 1, alpha: 0.90).setFill()
-        NSBezierPath(roundedRect: rect, xRadius: w / 2, yRadius: w / 2).fill()
+        let w = max(1.0, min(1.5, (bounds.width * 0.012).rounded()))
+        let x = ((bounds.width - w) / 2).rounded(.down)
+        let inset = max(2.0, bounds.height * 0.10)
+        NSColor(calibratedWhite: 1.0, alpha: 0.42).setFill()
+        NSRect(x: x, y: inset, width: w, height: bounds.height - inset * 2).fill()
+    }
+}
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    let line = LineView(frame: NSRect(x: 0, y: 0, width: 256, height: 256))
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        bindTile()
+        // Accessory keeps a persistent-apps tile but drops the running-app indicator.
+        NSApp.setActivationPolicy(.accessory)
+        bindTile()
+    }
+
+    func bindTile() {
+        NSApp.dockTile.contentView = line
+        NSApp.dockTile.display()
     }
 }
 
 let app = NSApplication.shared
+let delegate = AppDelegate()
+app.delegate = delegate
 app.setActivationPolicy(.regular)
-let view = LineView(frame: NSRect(x: 0, y: 0, width: 256, height: 256))
-app.dockTile.contentView = view
-app.dockTile.display()
 app.run()

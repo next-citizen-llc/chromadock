@@ -9,15 +9,30 @@ enum DividerManager {
     }
 
     static func ensureHelpers(count: Int) throws -> [URL] {
-        guard count > 0 else { return [] }
         guard let exe = bundledHelperURL(), FileManager.default.fileExists(atPath: exe.path) else {
             throw NSError(domain: "ChromaDock", code: 2, userInfo: [NSLocalizedDescriptionKey: "Divider helper is missing from the app bundle."])
         }
         var urls: [URL] = []
-        for i in 1...count {
-            urls.append(try installHelper(index: i, executable: exe))
+        if count > 0 {
+            for i in 1...count {
+                urls.append(try installHelper(index: i, executable: exe))
+            }
         }
+        pruneHelpers(keeping: count)
         return urls
+    }
+
+    static func pruneHelpers(keeping count: Int) {
+        let dir = Paths.dividersDir
+        guard let items = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return }
+        for url in items where url.pathExtension == "app" {
+            let name = url.deletingPathExtension().lastPathComponent
+            guard name.hasPrefix("Divider ") else { continue }
+            let n = Int(name.dropFirst("Divider ".count)) ?? 0
+            if n < 1 || n > count {
+                try? FileManager.default.removeItem(at: url)
+            }
+        }
     }
 
     static func installHelper(index: Int, executable: URL) throws -> URL {
@@ -35,20 +50,11 @@ enum DividerManager {
         try FileManager.default.copyItem(at: executable, to: destExe)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destExe.path)
 
-        if let icns = Bundle.main.url(forResource: "AppIcon", withExtension: "icns") {
-            let destIcns = resources.appendingPathComponent("AppIcon.icns")
-            if FileManager.default.fileExists(atPath: destIcns.path) {
-                try FileManager.default.removeItem(at: destIcns)
-            }
-            try FileManager.default.copyItem(at: icns, to: destIcns)
-        }
-
         let ident = "\(Paths.dividerBundlePrefix)\(index)"
         let info: [String: Any] = [
             "CFBundleDevelopmentRegion": "en",
             "CFBundleDisplayName": "│",
             "CFBundleExecutable": Paths.helperExecutableName,
-            "CFBundleIconFile": "AppIcon",
             "CFBundleIdentifier": ident,
             "CFBundleInfoDictionaryVersion": "6.0",
             "CFBundleName": "ChromaDock Divider \(index)",
@@ -104,5 +110,6 @@ enum DividerManager {
 
     static func stopHelpers() {
         _ = try? DockIO.run("/usr/bin/pkill", ["-x", Paths.helperExecutableName])
+        _ = try? DockIO.run("/usr/bin/pkill", ["-f", "Dock Dividers/Divider .*\\.app/Contents/MacOS/divider"])
     }
 }
