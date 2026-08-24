@@ -25,7 +25,19 @@ enum DividerManager {
             }
         }
         pruneHelpers(keeping: count)
+        try? FileManager.default.removeItem(at: Paths.legacyDividersDir)
         return urls
+    }
+
+    static func helperAppName(index: Int) -> String { "Line \(index).app" }
+
+    static func helperIndex(fromAppName name: String) -> Int? {
+        for prefix in ["Line ", "Divider "] {
+            if name.hasPrefix(prefix), let n = Int(name.dropFirst(prefix.count)), n > 0 {
+                return n
+            }
+        }
+        return nil
     }
 
     static func pruneHelpers(keeping count: Int) {
@@ -33,8 +45,7 @@ enum DividerManager {
         guard let items = try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else { return }
         for url in items where url.pathExtension == "app" {
             let name = url.deletingPathExtension().lastPathComponent
-            guard name.hasPrefix("Divider ") else { continue }
-            let n = Int(name.dropFirst("Divider ".count)) ?? 0
+            let n = helperIndex(fromAppName: name) ?? 0
             if n < 1 || n > count {
                 try? FileManager.default.removeItem(at: url)
             }
@@ -47,7 +58,7 @@ enum DividerManager {
         into dir: URL = Paths.dividersDir,
         icon: URL? = nil
     ) throws -> URL {
-        let app = dir.appendingPathComponent("Divider \(index).app", isDirectory: true)
+        let app = dir.appendingPathComponent(helperAppName(index: index), isDirectory: true)
         let contents = app.appendingPathComponent("Contents")
         let macos = contents.appendingPathComponent("MacOS")
         let resources = contents.appendingPathComponent("Resources")
@@ -219,9 +230,7 @@ enum DividerManager {
 
     static func bundleID(forHelperApp url: URL) -> String? {
         let name = url.deletingPathExtension().lastPathComponent
-        guard name.hasPrefix("Divider "), let n = Int(name.dropFirst("Divider ".count)), n > 0 else {
-            return nil
-        }
+        guard let n = helperIndex(fromAppName: name) else { return nil }
         return "\(Paths.dividerBundlePrefix)\(n)"
     }
 

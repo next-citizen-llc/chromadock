@@ -29,9 +29,12 @@ enum Paths {
         return url
     }
     static var dividersDir: URL {
-        let url = appSupport.appendingPathComponent("Dividers", isDirectory: true)
+        let url = appSupport.appendingPathComponent("Lines", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
+    }
+    static var legacyDividersDir: URL {
+        appSupport.appendingPathComponent("Dividers", isDirectory: true)
     }
     static var latestBackup: URL { backupsDir.appendingPathComponent("com.apple.dock.latest.plist") }
     static var dockPlist: URL {

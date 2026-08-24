@@ -273,6 +273,10 @@ final class HelperLaunchIdentityTests: XCTestCase {
 
     func testBundleIDFromHelperAppName() {
         XCTAssertEqual(
+            DividerManager.bundleID(forHelperApp: URL(fileURLWithPath: "/tmp/Line 3.app")),
+            "llc.nextcitizen.ChromaDock.line.3"
+        )
+        XCTAssertEqual(
             DividerManager.bundleID(forHelperApp: URL(fileURLWithPath: "/tmp/Divider 3.app")),
             "llc.nextcitizen.ChromaDock.line.3"
         )
@@ -298,7 +302,7 @@ final class DividerIconTests: XCTestCase {
         try Data("#!/bin/sh\nexit 0\n".utf8).write(to: exe)
         try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: exe.path)
 
-        let stale = dir.appendingPathComponent("Divider 1.app/Contents/Resources", isDirectory: true)
+        let stale = dir.appendingPathComponent("Line 1.app/Contents/Resources", isDirectory: true)
         try fm.createDirectory(at: stale, withIntermediateDirectories: true)
         try Data("stale".utf8).write(to: stale.appendingPathComponent("AppIcon.icns"))
 
