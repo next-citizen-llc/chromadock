@@ -21,13 +21,15 @@ if args.contains("--apply") || args.contains("--restore") || args.contains("--sc
     _ = NSApplication.shared
     Task { @MainActor in
         let model = AppModel()
+        var failed = false
         if args.contains("--restore") {
-            await model.restoreAsync()
+            failed = !(await model.restoreAsync())
         } else if args.contains("--apply") {
             await model.refreshAsync()
-            await model.applyAsync()
+            failed = !(await model.applyAsync())
         } else {
             await model.refreshAsync()
+            failed = model.apps.isEmpty
         }
         fputs(model.status + "\n", stdout)
         if args.contains("--scan") {
@@ -42,7 +44,7 @@ if args.contains("--apply") || args.contains("--restore") || args.contains("--sc
                 fputs("\(group)\t\(app.label)\t\(app.bundleIdentifier)\t\(dock)\n", stdout)
             }
         }
-        exit(model.apps.isEmpty && !args.contains("--restore") ? 1 : 0)
+        exit(failed ? 1 : 0)
     }
     RunLoop.main.run()
 } else {
