@@ -318,6 +318,11 @@ final class AppModel: ObservableObject {
         return appPath
     }
 
+    nonisolated static func willEmitTile(_ app: DockApp, settings: AppSettings, dockedBundles: Set<String>) -> Bool {
+        if dockedBundles.contains(app.bundleIdentifier) { return true }
+        return settings.assignments[app.bundleIdentifier] != nil && !app.path.isEmpty
+    }
+
     enum DockApplyError: LocalizedError {
         case emptyScan
         case noAppTiles
@@ -347,19 +352,20 @@ final class AppModel: ObservableObject {
             }
         }
 
+        let dockedBundles = Set(byBundle.keys)
         var newApps: [[String: Any]] = []
         var dividerIndex = 0
         var helperURLs: [URL] = []
         if settings.insertDividers {
             let gaps = max(0, settings.groups.filter { group in
-                apps.contains(where: { $0.groupID == group.id })
+                apps.contains { $0.groupID == group.id && willEmitTile($0, settings: settings, dockedBundles: dockedBundles) }
             }.count - 1)
             helperURLs = try DividerManager.ensureHelpers(count: max(gaps, 0))
         }
 
         var first = true
         for group in settings.groups {
-            var members = apps.filter { $0.groupID == group.id }
+            var members = apps.filter { $0.groupID == group.id && willEmitTile($0, settings: settings, dockedBundles: dockedBundles) }
             if members.isEmpty { continue }
             if settings.sortByHue && group.sortByHue {
                 members = HueSampler.hueSorted(members)
@@ -373,7 +379,7 @@ final class AppModel: ObservableObject {
             for app in members {
                 if let tile = byBundle[app.bundleIdentifier] {
                     newApps.append(tile)
-                } else if settings.assignments[app.bundleIdentifier] != nil, !app.path.isEmpty {
+                } else {
                     newApps.append(DockIO.fileTile(
                         bundle: app.bundleIdentifier,
                         label: app.label,
