@@ -1,11 +1,11 @@
 # ChromaDock
 
-**Group the macOS Dock. Hue-sort each group. Draw Trash-style divider lines.**
+**Group the macOS Dock. Sort each group dark to light. Draw Trash-style divider lines.**
 
 ChromaDock reads the apps currently in your Dock, lets you put them into named
-groups, sorts each group by the dominant color of the app icon, and optionally
-inserts vertical chrome lines between groups — the same kind of hairline that
-sits to the left of Trash.
+groups, sorts each group by overall icon darkness (darkest on the left), and
+optionally inserts vertical chrome lines between groups — the same kind of
+hairline that sits to the left of Trash.
 
 Created by [Tristan Springmeyer (`@tristan-nextcz`)](https://github.com/tristan-nextcz) and
 organization-owned by [Next Citizen LLC](https://github.com/next-citizen-llc) for durable governance.
@@ -18,8 +18,8 @@ organization-owned by [Next Citizen LLC](https://github.com/next-citizen-llc) fo
 2. **Assign** apps to groups (System, Development, Browsers, Communication,
    Media, Other — rename, reorder, or add your own).
 3. **Apply** writes a new Dock order: groups stay together, each group is
-   sorted gray → rainbow, and a transparent vertical bar is placed between
-   groups.
+   sorted dark → light (darkest icon on the left), and a transparent vertical
+   bar is placed between groups.
 4. **Restore** puts back the last backup taken immediately before Apply.
 
 Finder stays on the left. Trash stays on the right. Those two are owned by
@@ -28,7 +28,7 @@ macOS and are not rearranged.
 ```mermaid
 flowchart LR
     A["Scan Dock"] --> B["Assign groups"]
-    B --> C["Hue-sort inside each group"]
+    B --> C["Dark-to-light inside each group"]
     C --> D["Insert divider tiles"]
     D --> E["defaults import + killall Dock"]
     E --> F["Launch divider helpers"]

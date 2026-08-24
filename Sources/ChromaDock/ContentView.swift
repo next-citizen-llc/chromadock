@@ -182,7 +182,7 @@ struct ContentView: View {
 
     private var optionsBar: some View {
         HStack(spacing: 16) {
-            Toggle("Sort each group by hue", isOn: $model.settings.sortByHue)
+            Toggle("Sort each group dark to light", isOn: $model.settings.sortByHue)
                 .onChange(of: model.settings.sortByHue) { _, _ in model.saveSettings() }
             Toggle("Dividers", isOn: $model.settings.insertDividers)
                 .onChange(of: model.settings.insertDividers) { _, _ in model.saveSettings() }

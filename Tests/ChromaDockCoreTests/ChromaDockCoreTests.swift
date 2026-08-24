@@ -26,16 +26,73 @@ final class AppNameFilterTests: XCTestCase {
 }
 
 final class HueSortTests: XCTestCase {
-    func testGrayThenHueOrder() {
-        let gray = fixtureApp(label: "Gray", bundle: "g", group: "other", inDock: true)
-        var red = fixtureApp(label: "Red", bundle: "r", group: "other", inDock: true)
-        red.colorful = true
-        red.hue = 0.0
-        var blue = fixtureApp(label: "Blue", bundle: "b", group: "other", inDock: true)
-        blue.colorful = true
-        blue.hue = 0.6
-        let sorted = HueSampler.hueSorted([blue, gray, red])
-        XCTAssertEqual(sorted.map(\.label), ["Gray", "Red", "Blue"])
+    func testDarkestIconsComeFirst() {
+        var light = fixtureApp(label: "Calendar", bundle: "c", group: "system", inDock: true)
+        light.luminance = 0.92
+        light.colorful = true
+        light.hue = 0.08
+        var dark = fixtureApp(label: "Terminal", bundle: "t", group: "system", inDock: true)
+        dark.luminance = 0.08
+        var mid = fixtureApp(label: "Settings", bundle: "s", group: "system", inDock: true)
+        mid.luminance = 0.45
+        let sorted = HueSampler.hueSorted([light, dark, mid])
+        XCTAssertEqual(sorted.map(\.label), ["Terminal", "Settings", "Calendar"])
+    }
+
+    func testColorfulDoesNotJumpAheadOfDarkerGray() {
+        var gray = fixtureApp(label: "Passwords", bundle: "p", group: "system", inDock: true)
+        gray.luminance = 0.12
+        var colorful = fixtureApp(label: "Photos", bundle: "ph", group: "system", inDock: true)
+        colorful.colorful = true
+        colorful.hue = 0.0
+        colorful.luminance = 0.72
+        let sorted = HueSampler.hueSorted([colorful, gray])
+        XCTAssertEqual(sorted.map(\.label), ["Passwords", "Photos"])
+    }
+
+    func testEqualLuminanceUsesLabel() {
+        var a = fixtureApp(label: "B-app", bundle: "b", group: "other", inDock: true)
+        a.luminance = 0.4
+        var b = fixtureApp(label: "A-app", bundle: "a", group: "other", inDock: true)
+        b.luminance = 0.4
+        XCTAssertEqual(HueSampler.hueSorted([a, b]).map(\.label), ["A-app", "B-app"])
+    }
+}
+
+final class IconLuminanceTests: XCTestCase {
+    func testSolidBlackIsDarkerThanSolidWhite() {
+        let black = HueSampler.analyze(solidRaster(r: 8, g: 8, b: 8))
+        let white = HueSampler.analyze(solidRaster(r: 245, g: 245, b: 245))
+        XCTAssertNotNil(black)
+        XCTAssertNotNil(white)
+        XCTAssertLessThan(black!.luminance, 0.08)
+        XCTAssertGreaterThan(white!.luminance, 0.90)
+        XCTAssertLessThan(black!.luminance, white!.luminance)
+    }
+
+    func testDarkBlueIsDarkerThanBrightYellow() {
+        let blue = HueSampler.analyze(solidRaster(r: 0, g: 0, b: 90))
+        let yellow = HueSampler.analyze(solidRaster(r: 255, g: 220, b: 0))
+        XCTAssertNotNil(blue)
+        XCTAssertNotNil(yellow)
+        XCTAssertLessThan(blue!.luminance, yellow!.luminance)
+    }
+
+    func testMostlyBlackIconStaysDark() {
+        var raster = solidRaster(r: 6, g: 6, b: 6, size: 16)
+        // One saturated pixel must not make the icon sort as light.
+        let o = 4 * (8 * 16 + 8)
+        raster = HueSampler.Raster(size: raster.size, bytesPerRow: raster.bytesPerRow, bytes: {
+            var bytes = raster.bytes
+            bytes[o] = 255
+            bytes[o + 1] = 40
+            bytes[o + 2] = 40
+            bytes[o + 3] = 255
+            return bytes
+        }())
+        let sample = HueSampler.analyze(raster)
+        XCTAssertNotNil(sample)
+        XCTAssertLessThan(sample!.luminance, 0.12)
     }
 }
 
@@ -557,10 +614,23 @@ private func fixtureApp(label: String, bundle: String, group: String, inDock: Bo
         saturation: 0,
         value: 0,
         colorful: false,
+        luminance: 0,
         hex: "#000000",
         groupID: group,
         inDock: inDock
     )
+}
+
+private func solidRaster(r: UInt8, g: UInt8, b: UInt8, a: UInt8 = 255, size: Int = 8) -> HueSampler.Raster {
+    var bytes = [UInt8](repeating: 0, count: size * size * 4)
+    for i in 0..<(size * size) {
+        let o = i * 4
+        bytes[o] = r
+        bytes[o + 1] = g
+        bytes[o + 2] = b
+        bytes[o + 3] = a
+    }
+    return HueSampler.Raster(size: size, bytesPerRow: size * 4, bytes: bytes)
 }
 
 private func makeSplitImage(width: Int, height: Int) -> CGImage? {
