@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var groupTitleDraft = ""
     @FocusState private var focusedRenameID: String?
     @FocusState private var groupNameFocused: Bool
+    @State private var showPaidComingSoon = false
 
     var body: some View {
         NavigationSplitView {
@@ -185,17 +186,7 @@ struct ContentView: View {
                 .onChange(of: model.settings.sortByHue) { _, _ in model.saveSettings() }
             Toggle("Dividers", isOn: $model.settings.insertDividers)
                 .onChange(of: model.settings.insertDividers) { _, _ in model.saveSettings() }
-            Picker("Style", selection: $model.settings.dividerStyle) {
-                Text("Lines").tag(DividerStyle.line)
-                Text("Dots").tag(DividerStyle.dots)
-            }
-            .pickerStyle(.segmented)
-            .frame(maxWidth: 168)
-            .disabled(!model.settings.insertDividers)
-            .onChange(of: model.settings.dividerStyle) { _, _ in
-                model.dividerStyleDidChange()
-            }
-            .accessibilityLabel("Divider style")
+            separatorsPicker
             Toggle("Keep dividers drawn", isOn: $model.settings.keepDividersRunning)
                 .onChange(of: model.settings.keepDividersRunning) { _, on in
                     model.saveSettings()
@@ -214,6 +205,66 @@ struct ContentView: View {
         }
         .toggleStyle(.checkbox)
         .padding(10)
+        .alert("Coming soon in paid version", isPresented: $showPaidComingSoon) {
+            Button("OK", role: .cancel) {}
+        }
+    }
+
+    private var separatorsPicker: some View {
+        HStack(spacing: 8) {
+            Text("Separators")
+                .foregroundStyle(.secondary)
+            ForEach(DividerStyle.catalog) { style in
+                separatorButton(style)
+            }
+            Button("Create") { showPaidComingSoon = true }
+                .buttonStyle(.link)
+                .accessibilityLabel("Create separator")
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Separators")
+    }
+
+    private func separatorButton(_ style: DividerStyle) -> some View {
+        let selected = model.settings.dividerStyle == style
+        return Button {
+            model.settings.dividerStyle = style
+            model.dividerStyleDidChange()
+        } label: {
+            VStack(spacing: 2) {
+                Image(nsImage: separatorPreviewImage(style))
+                    .interpolation(.high)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 28, height: 28)
+                    .padding(4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color.primary.opacity(0.06))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(selected ? Color.accentColor : Color.secondary.opacity(0.35), lineWidth: selected ? 2 : 1)
+                    )
+                Text(style.letter)
+                    .font(.caption2)
+                    .foregroundStyle(selected ? .primary : .secondary)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(!model.settings.insertDividers)
+        .accessibilityLabel(style.accessibilityName)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func separatorPreviewImage(_ style: DividerStyle) -> NSImage {
+        let paint = LineStyle.Paint(white: 0.08, alpha: 0.92)
+        if let data = try? DividerManager.markPNG(pixelSize: 64, style: style, paint: paint),
+           let image = NSImage(data: data) {
+            image.isTemplate = false
+            return image
+        }
+        return NSImage(size: NSSize(width: 64, height: 64))
     }
 
     private var filterBar: some View {
