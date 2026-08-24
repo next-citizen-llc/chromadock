@@ -6,6 +6,7 @@ import Foundation
 /// so `NSDockTile.contentView` sticks and the running-app dot is shown.
 final class LineView: NSView {
     var paint = LineStyle.Paint.light
+    var style = DividerStyle.line
 
     override var isOpaque: Bool { false }
     override var wantsDefaultClipping: Bool { false }
@@ -13,11 +14,8 @@ final class LineView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         NSColor.clear.setFill()
         bounds.fill()
-        let w = max(1.0, min(1.5, (bounds.width * 0.012).rounded()))
-        let x = ((bounds.width - w) / 2).rounded(.down)
-        let inset = max(2.0, bounds.height * 0.10)
-        NSColor(calibratedWhite: paint.white, alpha: paint.alpha).setFill()
-        NSRect(x: x, y: inset, width: w, height: bounds.height - inset * 2).fill()
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        DividerMark.draw(ctx: ctx, bounds: bounds, style: style, paint: paint)
     }
 }
 
@@ -42,17 +40,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func refreshStyle() {
         let dark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        let next: LineStyle.Paint
+        let nextPaint: LineStyle.Paint
         if let y = sampleWallpaperLuminance() {
-            next = LineStyle.paint(luminance: y, darkAppearance: dark)
+            nextPaint = LineStyle.paint(luminance: y, darkAppearance: dark)
         } else {
-            next = dark ? .light : .dark
+            nextPaint = dark ? .light : .dark
         }
-        if next != line.paint {
-            line.paint = next
+        let nextStyle = currentDividerStyle()
+        if nextPaint != line.paint || nextStyle != line.style {
+            line.paint = nextPaint
+            line.style = nextStyle
             line.needsDisplay = true
             bindTile()
         }
+    }
+
+    private func currentDividerStyle() -> DividerStyle {
+        guard let data = try? Data(contentsOf: Paths.settingsURL),
+              let settings = try? JSONDecoder().decode(AppSettings.self, from: data) else {
+            return .line
+        }
+        return settings.dividerStyle
     }
 
     private func observeAppearance() {
@@ -81,6 +89,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil
         )
         NSApp.addObserver(self, forKeyPath: "effectiveAppearance", options: [.new], context: nil)
+        DistributedNotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appearanceChanged),
+            name: NSNotification.Name(Paths.settingsChangedNotification),
+            object: nil
+        )
     }
 
     override func observeValue(

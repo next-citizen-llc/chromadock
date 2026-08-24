@@ -324,6 +324,32 @@ final class HelperLaunchIdentityTests: XCTestCase {
     }
 }
 
+final class DividerStyleTests: XCTestCase {
+    func testMissingDividerStyleDecodesAsLines() throws {
+        let encoded = try JSONEncoder().encode(AppSettings.default)
+        var obj = try XCTUnwrap(try JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        obj.removeValue(forKey: "dividerStyle")
+        let data = try JSONSerialization.data(withJSONObject: obj)
+        let decoded = try JSONDecoder().decode(AppSettings.self, from: data)
+        XCTAssertEqual(decoded.dividerStyle, .line)
+    }
+
+    func testDotsLayoutIsCenterLargeWithSmallerSides() {
+        let layout = DividerMark.circleLayout(in: CGRect(x: 0, y: 0, width: 100, height: 100))
+        XCTAssertGreaterThan(layout.main.width, layout.left.width)
+        XCTAssertEqual(layout.left.width, layout.right.width, accuracy: 0.01)
+        XCTAssertLessThan(layout.left.midX, layout.main.midX)
+        XCTAssertGreaterThan(layout.right.midX, layout.main.midX)
+        XCTAssertEqual(layout.left.midY, layout.main.midY, accuracy: 0.01)
+    }
+
+    func testDotsPNGIsNotEmpty() throws {
+        let data = try DividerManager.markPNG(pixelSize: 128, style: .dots)
+        XCTAssertGreaterThan(data.count, 32)
+        XCTAssertEqual(Array(data.prefix(8)), [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+    }
+}
+
 final class LineStyleTests: XCTestCase {
     func testDarkWallpaperGetsDarkHairline() {
         XCTAssertEqual(LineStyle.paint(luminance: 0.12, darkAppearance: true), .dark)

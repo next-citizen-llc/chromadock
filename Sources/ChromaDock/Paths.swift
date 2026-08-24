@@ -20,6 +20,7 @@ enum Paths {
             || path.contains("/Application Support/ChromaDock/Dividers/")
     }
     static let helperExecutableName = "ChromaDockDivider"
+    static let settingsChangedNotification = "llc.nextcitizen.ChromaDock.settingsChanged"
 
     static var appSupport: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first

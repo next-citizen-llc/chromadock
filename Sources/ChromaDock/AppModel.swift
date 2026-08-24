@@ -191,7 +191,7 @@ final class AppModel: ObservableObject {
             let dict = try DockIO.exportPlist()
             let needed = DividerManager.dividerCount(in: DockIO.persistentApps(dict))
             if needed > 0 {
-                let urls = try DividerManager.ensureHelpers(count: needed)
+                let urls = try DividerManager.ensureHelpers(count: needed, style: settings.dividerStyle)
                 if settings.keepDividersRunning {
                     try await Task.sleep(nanoseconds: 1_600_000_000)
                     _ = await DividerManager.launchHelpers(urls)
@@ -275,8 +275,22 @@ final class AppModel: ObservableObject {
         do {
             let data = try JSONEncoder().encode(settings)
             try data.write(to: Paths.settingsURL, options: .atomic)
+            DistributedNotificationCenter.default().postNotificationName(
+                Notification.Name(Paths.settingsChangedNotification),
+                object: nil,
+                userInfo: nil,
+                deliverImmediately: true
+            )
         } catch {
             status = "Could not save settings: \(error.localizedDescription)"
+        }
+    }
+
+    func dividerStyleDidChange() {
+        saveSettings()
+        let style = settings.dividerStyle
+        Task.detached {
+            try? DividerManager.rewriteInstalledIcons(style: style)
         }
     }
 
@@ -570,7 +584,7 @@ final class AppModel: ObservableObject {
             let gaps = max(0, settings.groups.filter { group in
                 apps.contains { $0.groupID == group.id && willEmitTile($0, settings: settings, dockedBundles: dockedBundles) }
             }.count - 1)
-            helperURLs = try DividerManager.ensureHelpers(count: max(gaps, 0))
+            helperURLs = try DividerManager.ensureHelpers(count: max(gaps, 0), style: settings.dividerStyle)
         }
         let newApps = try buildPersistentApps(
             settings: settings,

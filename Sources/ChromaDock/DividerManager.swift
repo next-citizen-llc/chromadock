@@ -11,7 +11,7 @@ enum DividerManager {
                 .appendingPathComponent("Contents/MacOS/\(Paths.helperExecutableName)", isDirectory: false)
     }
 
-    static func ensureHelpers(count: Int) throws -> [URL] {
+    static func ensureHelpers(count: Int, style: DividerStyle = .line) throws -> [URL] {
         guard let exe = bundledHelperURL(), FileManager.default.fileExists(atPath: exe.path) else {
             throw NSError(domain: "ChromaDock", code: 2, userInfo: [NSLocalizedDescriptionKey: "Divider helper is missing from the app bundle."])
         }
@@ -19,7 +19,7 @@ enum DividerManager {
         if count > 0 {
             let icon = FileManager.default.temporaryDirectory.appendingPathComponent("chromadock-divider-\(UUID().uuidString).icns")
             defer { try? FileManager.default.removeItem(at: icon) }
-            try writeHairlineIcns(to: icon)
+            try writeMarkIcns(to: icon, style: style)
             for i in 1...count {
                 urls.append(try installHelper(index: i, executable: exe, icon: icon))
             }
@@ -27,6 +27,22 @@ enum DividerManager {
         pruneHelpers(keeping: count)
         try? FileManager.default.removeItem(at: Paths.legacyDividersDir)
         return urls
+    }
+
+    static func rewriteInstalledIcons(style: DividerStyle) throws {
+        let icon = FileManager.default.temporaryDirectory.appendingPathComponent("chromadock-mark-\(UUID().uuidString).icns")
+        defer { try? FileManager.default.removeItem(at: icon) }
+        try writeMarkIcns(to: icon, style: style)
+        for url in installedHelperURLs() {
+            let dest = url.appendingPathComponent("Contents/Resources/Line.icns")
+            try? FileManager.default.removeItem(at: dest)
+            try FileManager.default.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: icon, to: dest)
+            _ = try? DockIO.run(
+                "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
+                ["-f", url.path]
+            )
+        }
     }
 
     static func helperAppName(index: Int) -> String { "Line \(index).app" }
@@ -79,7 +95,7 @@ enum DividerManager {
         if let icon {
             try FileManager.default.copyItem(at: icon, to: iconURL)
         } else {
-            try writeHairlineIcns(to: iconURL)
+            try writeMarkIcns(to: iconURL, style: .line)
         }
 
         let ident = "\(Paths.dividerBundlePrefix)\(index)"
@@ -114,6 +130,14 @@ enum DividerManager {
     }
 
     static func hairlinePNG(pixelSize: Int) throws -> Data {
+        try markPNG(pixelSize: pixelSize, style: .line, paint: .light)
+    }
+
+    static func markPNG(
+        pixelSize: Int,
+        style: DividerStyle,
+        paint: LineStyle.Paint = .dark
+    ) throws -> Data {
         guard pixelSize > 0,
               let space = CGColorSpace(name: CGColorSpace.sRGB),
               let ctx = CGContext(
@@ -129,12 +153,13 @@ enum DividerManager {
             throw NSError(domain: "ChromaDock", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not draw divider icon."])
         }
         ctx.clear(CGRect(x: 0, y: 0, width: pixelSize, height: pixelSize))
-        let size = CGFloat(pixelSize)
-        let w = max(1.0, min(1.5, (size * 0.012).rounded()))
-        let x = ((size - w) / 2).rounded(.down)
-        let inset = max(2.0, size * 0.10)
-        ctx.setFillColor(CGColor(gray: 1.0, alpha: 0.42))
-        ctx.fill(CGRect(x: x, y: inset, width: w, height: size - inset * 2))
+        let resolved = style == .dots ? LineStyle.Paint(white: 0.0, alpha: 1.0) : paint
+        DividerMark.draw(
+            ctx: ctx,
+            bounds: CGRect(x: 0, y: 0, width: pixelSize, height: pixelSize),
+            style: style,
+            paint: resolved
+        )
         guard let image = ctx.makeImage() else {
             throw NSError(domain: "ChromaDock", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not draw divider icon."])
         }
@@ -155,6 +180,10 @@ enum DividerManager {
     }
 
     static func writeHairlineIcns(to dest: URL) throws {
+        try writeMarkIcns(to: dest, style: .line)
+    }
+
+    static func writeMarkIcns(to dest: URL, style: DividerStyle) throws {
         let iconset = FileManager.default.temporaryDirectory
             .appendingPathComponent("chromadock-line-\(UUID().uuidString).iconset", isDirectory: true)
         try FileManager.default.createDirectory(at: iconset, withIntermediateDirectories: true)
@@ -172,7 +201,7 @@ enum DividerManager {
             ("icon_512x512@2x.png", 1024)
         ]
         for (name, size) in entries {
-            try hairlinePNG(pixelSize: size).write(to: iconset.appendingPathComponent(name))
+            try markPNG(pixelSize: size, style: style).write(to: iconset.appendingPathComponent(name))
         }
         _ = try DockIO.run("/usr/bin/iconutil", ["-c", "icns", "-o", dest.path, iconset.path])
     }
