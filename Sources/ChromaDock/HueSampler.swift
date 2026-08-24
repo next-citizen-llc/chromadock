@@ -2,7 +2,17 @@ import AppKit
 import Foundation
 
 enum HueSampler {
-    static func sample(path: String, size: Int = 48) -> (hue: Double, sat: Double, val: Double, colorful: Bool, hex: String)? {
+    struct Raster: Sendable {
+        let size: Int
+        let bytesPerRow: Int
+        let bytes: [UInt8]
+    }
+
+    typealias Sample = (hue: Double, sat: Double, val: Double, colorful: Bool, hex: String)
+
+    /// AppKit icon loading and `NSImage.draw` must run on the main thread.
+    @MainActor
+    static func rasterize(path: String, size: Int = 48) -> Raster? {
         guard FileManager.default.fileExists(atPath: path) else { return nil }
         let icon = NSWorkspace.shared.icon(forFile: path)
         icon.size = NSSize(width: size, height: size)
@@ -20,14 +30,22 @@ enum HueSampler {
         ) else { return nil }
 
         NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
         NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
         NSColor.clear.setFill()
         NSRect(x: 0, y: 0, width: size, height: size).fill()
         icon.draw(in: NSRect(x: 0, y: 0, width: size, height: size),
                   from: .zero, operation: .sourceOver, fraction: 1)
-        NSGraphicsContext.restoreGraphicsState()
-        guard let bytes = rep.bitmapData else { return nil }
+        guard let ptr = rep.bitmapData else { return nil }
         let bpr = max(rep.bytesPerRow, size * 4)
+        let bytes = Array(UnsafeBufferPointer(start: ptr, count: bpr * size))
+        return Raster(size: size, bytesPerRow: bpr, bytes: bytes)
+    }
+
+    nonisolated static func analyze(_ raster: Raster) -> Sample? {
+        let size = raster.size
+        let bpr = raster.bytesPerRow
+        let bytes = raster.bytes
 
         var hueW = [Double](repeating: 0, count: 36)
         var satW = [Double](repeating: 0, count: 36)
@@ -37,6 +55,7 @@ enum HueSampler {
         for y in 0..<size {
             for x in 0..<size {
                 let o = y * bpr + x * 4
+                guard o + 3 < bytes.count else { continue }
                 let a = Double(bytes[o + 3]) / 255.0
                 if a < 0.4 { continue }
                 let r = Double(bytes[o]) / 255.0 / max(a, 0.001)
@@ -87,6 +106,11 @@ enum HueSampler {
         }
         let hue = h.truncatingRemainder(dividingBy: 1)
         return (hue, s, v, colorful, hexFromHSV(hue, s, v))
+    }
+
+    @MainActor
+    static func sample(path: String, size: Int = 48) -> Sample? {
+        rasterize(path: path, size: size).flatMap(analyze)
     }
 
     static func sortKey(_ app: DockApp) -> (Int, Double, Double) {

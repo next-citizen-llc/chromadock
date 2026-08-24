@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-struct DockApp: Identifiable, Hashable, Codable {
+struct DockApp: Identifiable, Hashable, Codable, Sendable {
     var id: String { bundleIdentifier }
     var label: String
     var bundleIdentifier: String
@@ -16,13 +16,13 @@ struct DockApp: Identifiable, Hashable, Codable {
     var hueDegrees: Double { hue * 360 }
 }
 
-struct DockGroup: Identifiable, Hashable, Codable {
+struct DockGroup: Identifiable, Hashable, Codable, Sendable {
     var id: String
     var title: String
     var sortByHue: Bool
 }
 
-struct AppSettings: Codable {
+struct AppSettings: Codable, Sendable {
     var groups: [DockGroup]
     var assignments: [String: String] // bundle id -> group id
     var sortByHue: Bool

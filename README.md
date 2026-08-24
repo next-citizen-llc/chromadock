@@ -54,7 +54,7 @@ flowchart LR
 
 ### Disk image
 
-1. Download `ChromaDock-1.0.0.dmg` from
+1. Download the latest `ChromaDock-*.dmg` from
    [Releases](https://github.com/next-citizen-llc/chromadock/releases/latest).
 2. Open the image and drag **ChromaDock** to **Applications**.
 3. Right-click → **Open** the first time (ad-hoc signature).
@@ -72,7 +72,7 @@ open build/ChromaDock.app
 ```
 
 The built app is `build/ChromaDock.app`. The disk image is
-`dist/ChromaDock-1.0.0.dmg`.
+`dist/ChromaDock-<version>.dmg`.
 
 ---
 

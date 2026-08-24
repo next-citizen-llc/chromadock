@@ -2,7 +2,10 @@ import Foundation
 
 enum DockIO {
     static func exportPlist() throws -> [String: Any] {
-        let data = try run("/usr/bin/defaults", ["export", "com.apple.dock", "-"])
+        let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("chromadock-export-\(UUID().uuidString).plist")
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        _ = try run("/usr/bin/defaults", ["export", "com.apple.dock", tmp.path])
+        let data = try Data(contentsOf: tmp)
         let obj = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)
         guard let dict = obj as? [String: Any] else {
             throw NSError(domain: "ChromaDock", code: 1, userInfo: [NSLocalizedDescriptionKey: "Dock preferences were not a dictionary."])
@@ -67,10 +70,13 @@ enum DockIO {
         proc.standardOutput = out
         proc.standardError = err
         try proc.run()
-        proc.waitUntilExit()
+        // Drain pipes before waitUntilExit. A Dock export is ~100 KB; waiting first
+        // deadlocks once stdout fills the ~64 KB pipe buffer.
         let data = out.fileHandleForReading.readDataToEndOfFile()
+        let errData = err.fileHandleForReading.readDataToEndOfFile()
+        proc.waitUntilExit()
         if proc.terminationStatus != 0 {
-            let message = String(data: err.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? "command failed"
+            let message = String(data: errData, encoding: .utf8) ?? "command failed"
             throw NSError(domain: "ChromaDock", code: Int(proc.terminationStatus), userInfo: [NSLocalizedDescriptionKey: message])
         }
         return data

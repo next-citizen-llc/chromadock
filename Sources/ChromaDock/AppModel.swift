@@ -27,23 +27,41 @@ final class AppModel: ObservableObject {
     }
 
     func refresh() {
+        Task { await refreshAsync() }
+    }
+
+    func refreshAsync() async {
         isBusy = true
         status = "Reading Dock icons…"
+        defer { isBusy = false }
         let settings = self.settings
-        DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                let scanned = try Self.scanDock(settings: settings)
-                DispatchQueue.main.async {
-                    self.apps = scanned
-                    self.status = "\(scanned.count) Dock apps."
-                    self.isBusy = false
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    self.status = error.localizedDescription
-                    self.isBusy = false
-                }
+        do {
+            let rows = try await Task.detached(priority: .userInitiated) {
+                let dict = try DockIO.exportPlist()
+                return Self.dockRows(from: dict, settings: settings)
+            }.value
+            var scanned: [DockApp] = []
+            scanned.reserveCapacity(rows.count)
+            for (index, row) in rows.enumerated() {
+                status = "Reading \(row.label)… (\(index + 1)/\(rows.count))"
+                await Task.yield()
+                let sample = HueSampler.rasterize(path: row.path).flatMap(HueSampler.analyze)
+                scanned.append(DockApp(
+                    label: row.label,
+                    bundleIdentifier: row.bundle,
+                    path: row.path,
+                    hue: sample?.hue ?? 0,
+                    saturation: sample?.sat ?? 0,
+                    value: sample?.val ?? 0,
+                    colorful: sample?.colorful ?? false,
+                    hex: sample?.hex ?? "#888888",
+                    groupID: row.groupID
+                ))
             }
+            apps = scanned
+            status = "\(scanned.count) Dock apps."
+        } catch {
+            status = error.localizedDescription
         }
     }
 
@@ -84,48 +102,47 @@ final class AppModel: ObservableObject {
     }
 
     func apply() {
+        Task { await applyAsync() }
+    }
+
+    func applyAsync() async {
         isBusy = true
         status = "Applying Dock arrangement…"
+        defer { isBusy = false }
         let snapshot = (settings: settings, apps: apps)
-        DispatchQueue.global(qos: .userInitiated).async {
-            do {
-                let backup = try Self.applyArrangement(settings: snapshot.settings, apps: snapshot.apps)
-                DispatchQueue.main.async {
-                    self.lastBackupURL = backup
-                    self.status = "Dock updated. Backup saved."
-                    self.isBusy = false
-                    self.refresh()
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    self.status = error.localizedDescription
-                    self.isBusy = false
-                }
-            }
+        do {
+            let backup = try await Task.detached(priority: .userInitiated) {
+                try Self.applyArrangement(settings: snapshot.settings, apps: snapshot.apps)
+            }.value
+            lastBackupURL = backup
+            status = "Dock updated. Backup saved."
+            await refreshAsync()
+        } catch {
+            status = error.localizedDescription
         }
     }
 
     func restore() {
+        Task { await restoreAsync() }
+    }
+
+    func restoreAsync() async {
         guard let url = lastBackupURL, FileManager.default.fileExists(atPath: url.path) else {
             status = "No backup to restore."
             return
         }
         isBusy = true
-        DispatchQueue.global(qos: .userInitiated).async {
-            do {
+        status = "Restoring previous Dock…"
+        defer { isBusy = false }
+        do {
+            try await Task.detached(priority: .userInitiated) {
                 try DockIO.restore(from: url)
                 DividerManager.stopHelpers()
-                DispatchQueue.main.async {
-                    self.status = "Restored previous Dock."
-                    self.isBusy = false
-                    self.refresh()
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    self.status = error.localizedDescription
-                    self.isBusy = false
-                }
-            }
+            }.value
+            status = "Restored previous Dock."
+            await refreshAsync()
+        } catch {
+            status = error.localizedDescription
         }
     }
 
@@ -164,9 +181,15 @@ final class AppModel: ObservableObject {
         return decoded
     }
 
-    nonisolated private static func scanDock(settings: AppSettings) throws -> [DockApp] {
-        let dict = try DockIO.exportPlist()
-        var result: [DockApp] = []
+    private struct DockRow: Sendable {
+        let label: String
+        let bundle: String
+        let path: String
+        let groupID: String
+    }
+
+    nonisolated private static func dockRows(from dict: [String: Any], settings: AppSettings) -> [DockRow] {
+        var rows: [DockRow] = []
         for tile in DockIO.persistentApps(dict) {
             if DockIO.isDividerTile(tile) { continue }
             let td = tile["tile-data"] as? [String: Any] ?? [:]
@@ -177,22 +200,11 @@ final class AppModel: ObservableObject {
             if path.hasPrefix("file://") {
                 path = URL(string: path)?.path ?? path
             }
-            let sample = HueSampler.sample(path: path)
             let group = settings.assignments[bundle]
                 ?? Heuristic.suggestedGroup(bundle: bundle, label: label)
-            result.append(DockApp(
-                label: label,
-                bundleIdentifier: bundle,
-                path: path,
-                hue: sample?.hue ?? 0,
-                saturation: sample?.sat ?? 0,
-                value: sample?.val ?? 0,
-                colorful: sample?.colorful ?? false,
-                hex: sample?.hex ?? "#888888",
-                groupID: group
-            ))
+            rows.append(DockRow(label: label, bundle: bundle, path: path, groupID: group))
         }
-        return result
+        return rows
     }
 
     nonisolated static func applyArrangement(settings: AppSettings, apps: [DockApp]) throws -> URL {

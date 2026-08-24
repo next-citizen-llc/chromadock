@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 let args = CommandLine.arguments
@@ -6,6 +7,7 @@ if args.contains("--help") || args.contains("-h") {
     ChromaDock — group Dock apps and hue-sort each group.
 
       (no args)     open the app
+      --scan        read Dock icons and print the result
       --apply       apply the saved grouping now
       --restore     restore the last Dock backup
       --help        show this help
@@ -14,28 +16,22 @@ if args.contains("--help") || args.contains("-h") {
     exit(0)
 }
 
-if args.contains("--apply") || args.contains("--restore") {
-    let sem = DispatchSemaphore(value: 0)
+if args.contains("--apply") || args.contains("--restore") || args.contains("--scan") {
+    _ = NSApplication.shared
     Task { @MainActor in
         let model = AppModel()
         if args.contains("--restore") {
-            model.restore()
+            await model.restoreAsync()
+        } else if args.contains("--apply") {
+            await model.refreshAsync()
+            await model.applyAsync()
         } else {
-            model.refresh()
-        }
-        // Give scan a moment when applying.
-        if args.contains("--apply") {
-            try? await Task.sleep(nanoseconds: 2_500_000_000)
-            model.apply()
-            try? await Task.sleep(nanoseconds: 3_000_000_000)
-        } else {
-            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            await model.refreshAsync()
         }
         fputs(model.status + "\n", stdout)
-        sem.signal()
-        exit(0)
+        exit(model.apps.isEmpty && !args.contains("--restore") ? 1 : 0)
     }
-    sem.wait()
+    RunLoop.main.run()
 } else {
     ChromaDockApp.main()
 }
