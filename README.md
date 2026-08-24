@@ -82,8 +82,8 @@ macOS does not let a third-party app insert extra copies of the private
 `DOCKSeparatorTile` used next to Trash. Empty icon artwork is filled with a
 glass plate. The working approach:
 
-- ChromaDock installs small helper apps (`llc.nextcitizen.ChromaDock.divider.N`)
-  into `~/Library/Application Support/ChromaDock/Dividers/`.
+- ChromaDock installs small helper apps (`llc.nextcitizen.ChromaDock.line.N`)
+  into `~/Library/Application Support/ChromaDock/Lines/`.
 - Each helper bundle uses a mostly-transparent **hairline icon** as its Dock
   artwork, so the line is the file-tile itself.
 - Helpers are `LSUIElement` agents. They do not show a running-app dot, appear
