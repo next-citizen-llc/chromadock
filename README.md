@@ -14,12 +14,13 @@ organization-owned by [Next Citizen LLC](https://github.com/next-citizen-llc) fo
 
 ## What it does
 
-1. **Scan** the Dock and sample each icon’s hue.
+1. **Scan** snapshots the live Dock: divider sections become group membership,
+   then each icon is sampled.
 2. **Assign** apps to groups (System, Development, Browsers, Communication,
    Media, Other — rename, reorder, or add your own).
-3. **Apply** writes a new Dock order: groups stay together, each group is
-   sorted dark → light (darkest icon on the left), and a transparent vertical
-   bar is placed between groups.
+3. **Apply** backs up the current Dock, keeps any icons you moved across
+   sections since Scan, then writes groups together sorted dark → light
+   (darkest on the left) with a transparent bar between groups.
 4. **Restore** puts back the last backup taken immediately before Apply.
 
 Finder stays on the left. Trash stays on the right. Those two are owned by

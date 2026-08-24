@@ -383,6 +383,9 @@ struct MenuBarView: View {
 
     var body: some View {
         Button("Open ChromaDock…") { openWindow(id: "main") }
+            .onReceive(NotificationCenter.default.publisher(for: .chromaDockReopen)) { _ in
+                openWindow(id: "main")
+            }
         Button("Scan Dock") { model.refresh() }
             .disabled(model.isBusy)
         Button("Apply arrangement") { model.apply() }
