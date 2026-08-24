@@ -182,6 +182,17 @@ final class BuildPersistentAppsTests: XCTestCase {
     }
 }
 
+final class HelperLaunchIdentityTests: XCTestCase {
+    func testBundleIDFromHelperAppName() {
+        XCTAssertEqual(
+            DividerManager.bundleID(forHelperApp: URL(fileURLWithPath: "/tmp/Divider 3.app")),
+            "llc.nextcitizen.ChromaDock.divider.3"
+        )
+        XCTAssertNil(DividerManager.bundleID(forHelperApp: URL(fileURLWithPath: "/tmp/Safari.app")))
+        XCTAssertNil(DividerManager.bundleID(forHelperApp: URL(fileURLWithPath: "/tmp/Divider.app")))
+    }
+}
+
 final class DividerIconTests: XCTestCase {
     func testHairlinePNGIsTransparentPNG() throws {
         let data = try DividerManager.hairlinePNG(pixelSize: 128)

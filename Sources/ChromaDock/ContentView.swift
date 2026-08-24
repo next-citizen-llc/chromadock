@@ -186,7 +186,14 @@ struct ContentView: View {
             Toggle("Transparent divider lines", isOn: $model.settings.insertDividers)
                 .onChange(of: model.settings.insertDividers) { _, _ in model.saveSettings() }
             Toggle("Keep lines drawn", isOn: $model.settings.keepDividersRunning)
-                .onChange(of: model.settings.keepDividersRunning) { _, _ in model.saveSettings() }
+                .onChange(of: model.settings.keepDividersRunning) { _, on in
+                    model.saveSettings()
+                    if on {
+                        model.startDividerHelpersIfNeeded()
+                    } else {
+                        model.stopDividerKeepAlive()
+                    }
+                }
             Spacer()
             Toggle("Open at login", isOn: $model.settings.openAtLogin)
                 .onChange(of: model.settings.openAtLogin) { _, on in

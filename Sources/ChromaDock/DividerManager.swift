@@ -187,11 +187,62 @@ enum DividerManager {
         ]
     }
 
-    static func launchHelpers(_ urls: [URL]) {
-        for url in urls {
+    static func installedHelperURLs(in dir: URL = Paths.dividersDir) -> [URL] {
+        guard let items = try? FileManager.default.contentsOfDirectory(
+            at: dir,
+            includingPropertiesForKeys: nil
+        ) else { return [] }
+        return items
+            .filter { $0.pathExtension == "app" }
+            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+    }
+
+    static func bundleID(forHelperApp url: URL) -> String? {
+        let name = url.deletingPathExtension().lastPathComponent
+        guard name.hasPrefix("Divider "), let n = Int(name.dropFirst("Divider ".count)), n > 0 else {
+            return nil
+        }
+        return "\(Paths.dividerBundlePrefix)\(n)"
+    }
+
+    static func runningHelperCount(for urls: [URL]) -> Int {
+        urls.reduce(into: 0) { count, url in
+            guard let id = bundleID(forHelperApp: url) else { return }
+            if !NSRunningApplication.runningApplications(withBundleIdentifier: id).isEmpty {
+                count += 1
+            }
+        }
+    }
+
+    @MainActor
+    static func launchHelpers(_ urls: [URL], retries: Int = 2) async -> Int {
+        guard !urls.isEmpty else { return 0 }
+        var pending = urls
+        for attempt in 0...max(retries, 0) {
+            if pending.isEmpty { break }
+            if attempt > 0 {
+                try? await Task.sleep(nanoseconds: 400_000_000)
+            }
+            for url in pending {
+                await openHelper(url)
+            }
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            pending = pending.filter { url in
+                guard let id = bundleID(forHelperApp: url) else { return true }
+                return NSRunningApplication.runningApplications(withBundleIdentifier: id).isEmpty
+            }
+        }
+        return urls.count - pending.count
+    }
+
+    @MainActor
+    private static func openHelper(_ url: URL) async {
+        await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
             let cfg = NSWorkspace.OpenConfiguration()
             cfg.activates = false
-            NSWorkspace.shared.openApplication(at: url, configuration: cfg, completionHandler: nil)
+            NSWorkspace.shared.openApplication(at: url, configuration: cfg) { _, _ in
+                cont.resume()
+            }
         }
     }
 
