@@ -75,7 +75,7 @@ enum DividerManager {
         try FileManager.default.copyItem(at: executable, to: destExe)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destExe.path)
 
-        let iconURL = resources.appendingPathComponent("Hairline.icns")
+        let iconURL = resources.appendingPathComponent("Line.icns")
         if let icon {
             try FileManager.default.copyItem(at: icon, to: iconURL)
         } else {
@@ -87,13 +87,13 @@ enum DividerManager {
             "CFBundleDevelopmentRegion": "en",
             "CFBundleDisplayName": "│",
             "CFBundleExecutable": Paths.helperExecutableName,
-            "CFBundleIconFile": "Hairline",
+            "CFBundleIconFile": "Line",
             "CFBundleIdentifier": ident,
             "CFBundleInfoDictionaryVersion": "6.0",
             "CFBundleName": "ChromaDock Divider \(index)",
             "CFBundlePackageType": "APPL",
-            "CFBundleShortVersionString": "1.3",
-            "CFBundleVersion": "4",
+            "CFBundleShortVersionString": "1.4",
+            "CFBundleVersion": "5",
             "LSMinimumSystemVersion": "14.0",
             "NSHighResolutionCapable": true
         ]
@@ -274,6 +274,75 @@ enum DividerManager {
         }
     }
 
+    static let linesLaunchAgentLabel = "llc.nextcitizen.ChromaDock.lines"
+
+    static func linesLaunchAgentPlist(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
+        home.appendingPathComponent("Library/LaunchAgents/\(linesLaunchAgentLabel).plist")
+    }
+
+    static func linesKeepScript(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
+        home.appendingPathComponent("Library/Application Support/ChromaDock/keep-lines.sh")
+    }
+
+    static func installLinesLaunchAgent() {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let script = linesKeepScript(home: home)
+        let plist = linesLaunchAgentPlist(home: home)
+        let dir = Paths.dividersDir.path
+        let body = """
+        #!/bin/bash
+        DIR=\(shellSingleQuote(dir))
+        while true; do
+          if [[ -d "$DIR" ]]; then
+            shopt -s nullglob
+            for app in "$DIR"/Line\\ *.app; do
+              exe="$app/Contents/MacOS/\(Paths.helperExecutableName)"
+              if [[ -x "$exe" ]] && ! pgrep -f "$exe" >/dev/null 2>&1; then
+                /usr/bin/open -g "$app" || true
+              fi
+            done
+          fi
+          sleep 2
+        done
+        """
+        do {
+            try FileManager.default.createDirectory(at: script.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try body.write(to: script, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: script.path)
+            let agent: [String: Any] = [
+                "Label": linesLaunchAgentLabel,
+                "RunAtLoad": true,
+                "KeepAlive": true,
+                "ProgramArguments": ["/bin/bash", script.path]
+            ]
+            let data = try PropertyListSerialization.data(fromPropertyList: agent, format: .xml, options: 0)
+            try FileManager.default.createDirectory(at: plist.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: plist)
+            let uid = getuid()
+            _ = try? DockIO.run("/bin/launchctl", ["bootout", "gui/\(uid)/\(linesLaunchAgentLabel)"])
+            _ = try? DockIO.run("/bin/launchctl", ["bootstrap", "gui/\(uid)", plist.path])
+        } catch {
+            return
+        }
+    }
+
+    static func unloadLinesLaunchAgent() {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let plist = linesLaunchAgentPlist(home: home)
+        let uid = getuid()
+        _ = try? DockIO.run("/bin/launchctl", ["bootout", "gui/\(uid)/\(linesLaunchAgentLabel)"])
+        if FileManager.default.fileExists(atPath: plist.path) {
+            _ = try? DockIO.run("/bin/launchctl", ["unload", plist.path])
+            try? FileManager.default.removeItem(at: plist)
+        }
+        try? FileManager.default.removeItem(at: linesKeepScript(home: home))
+        _ = try? DockIO.run("/usr/bin/pkill", ["-f", "Application Support/ChromaDock/keep-lines.sh"])
+    }
+
+    private static func shellSingleQuote(_ path: String) -> String {
+        "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
     static let legacyLaunchAgentLabel = "com.nextcz.dock-dividers"
 
     static func legacyLaunchAgentPlist(home: URL) -> URL {
@@ -294,6 +363,7 @@ enum DividerManager {
 
     static func stopHelpers() {
         let home = FileManager.default.homeDirectoryForCurrentUser
+        unloadLinesLaunchAgent()
         unloadLegacyLaunchAgent(home: home)
         _ = try? DockIO.run("/usr/bin/pkill", ["-f", "dock-group-hue/start-dividers.sh"])
         _ = try? DockIO.run("/usr/bin/pkill", ["-x", Paths.helperExecutableName])
