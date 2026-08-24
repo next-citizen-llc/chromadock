@@ -88,9 +88,10 @@ glass plate. The working approach:
   transparent view. **Separators** offers shipped marks: A is a solid
   hairline, B is a vertical dashed line (four dashes). Dock glass shows
   through. macOS then shows a running-app indicator under each mark.
-- The hairline color follows the wallpaper behind that tile: a dark line on
-  dark regions (including night mode), a light line on light regions. Helpers
-  restyle on appearance changes, space changes, wake, and once a day.
+- The hairline contrasts with the wallpaper behind that tile: a dark line on
+  light regions, a light line on dark regions (including night mode). Helpers
+  restyle when the desktop picture changes, and also on appearance, space,
+  wake, and screen changes.
 - **Keep lines drawn** relaunches those helpers after Apply, at login, and if
   a helper is quit (immediate relaunch plus a LaunchAgent so the tile stays
   a running hairline instead of falling back to an app-icon squircle).

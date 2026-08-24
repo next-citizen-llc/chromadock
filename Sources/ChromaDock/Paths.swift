@@ -49,4 +49,10 @@ enum Paths {
         URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent("Library/Preferences/com.apple.dock.plist")
     }
+
+    static var wallpaperStoreIndex: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
+        return base.appendingPathComponent("com.apple.wallpaper/Store/Index.plist")
+    }
 }

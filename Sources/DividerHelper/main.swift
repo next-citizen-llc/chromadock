@@ -21,16 +21,19 @@ final class LineView: NSView {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let line = LineView(frame: NSRect(x: 0, y: 0, width: 256, height: 256))
-    private var daily: Timer?
+    private var poll: Timer?
+    private var wallpaperSource: DispatchSourceFileSystemObject?
+    private var cachedDesktop: (key: String, image: CGImage)?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         bindTile()
         refreshStyle()
         observeAppearance()
-        daily = Timer.scheduledTimer(withTimeInterval: 86_400, repeats: true) { [weak self] _ in
+        observeWallpaper()
+        poll = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
             self?.refreshStyle()
         }
-        daily?.tolerance = 3_600
+        poll?.tolerance = 1
     }
 
     func bindTile() {
@@ -97,6 +100,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
+    private func observeWallpaper() {
+        armWallpaperWatch()
+    }
+
+    private func armWallpaperWatch() {
+        wallpaperSource?.cancel()
+        wallpaperSource = nil
+        let url = Paths.wallpaperStoreIndex
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+        let fd = open(url.path, O_EVTONLY)
+        guard fd >= 0 else { return }
+        let src = DispatchSource.makeFileSystemObjectSource(
+            fileDescriptor: fd,
+            eventMask: [.write, .rename, .delete, .attrib, .extend, .link],
+            queue: .main
+        )
+        src.setEventHandler { [weak self] in
+            self?.cachedDesktop = nil
+            self?.refreshStyle()
+            self?.armWallpaperWatch()
+        }
+        src.setCancelHandler { close(fd) }
+        src.resume()
+        wallpaperSource = src
+    }
+
     override func observeValue(
         forKeyPath keyPath: String?,
         of object: Any?,
@@ -126,14 +155,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func desktopImage(for screen: NSScreen) -> CGImage? {
-        guard let url = NSWorkspace.shared.desktopImageURL(for: screen),
-              let ns = NSImage(contentsOf: url) else { return nil }
+        guard let url = NSWorkspace.shared.desktopImageURL(for: screen) else { return nil }
+        let dark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let key = desktopCacheKey(url: url, dark: dark)
+        if let cached = cachedDesktop, cached.key == key {
+            return cached.image
+        }
+        guard let ns = NSImage(contentsOf: url) else { return nil }
         var rect = NSRect(origin: .zero, size: ns.size)
         var image: CGImage?
         NSApp.effectiveAppearance.performAsCurrentDrawingAppearance {
             image = ns.cgImage(forProposedRect: &rect, context: nil, hints: nil)
         }
+        if let image {
+            cachedDesktop = (key, image)
+        }
         return image
+    }
+
+    private func desktopCacheKey(url: URL, dark: Bool) -> String {
+        let path = url.path
+        let mtime = (try? FileManager.default.attributesOfItem(atPath: path)[.modificationDate] as? Date)?
+            .timeIntervalSince1970 ?? 0
+        var folderMTime = 0.0
+        if url.hasDirectoryPath,
+           let kids = try? FileManager.default.contentsOfDirectory(
+            at: url,
+            includingPropertiesForKeys: [.contentModificationDateKey]
+           ) {
+            folderMTime = kids.compactMap {
+                try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate?
+                    .timeIntervalSince1970
+            }.max() ?? 0
+        }
+        return "\(path)|\(mtime)|\(folderMTime)|\(dark)"
     }
 
     private func dockScreen() -> NSScreen? {

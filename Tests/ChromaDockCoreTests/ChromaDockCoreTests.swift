@@ -416,19 +416,19 @@ final class DividerStyleTests: XCTestCase {
 }
 
 final class LineStyleTests: XCTestCase {
-    func testDarkWallpaperGetsDarkHairline() {
-        XCTAssertEqual(LineStyle.paint(luminance: 0.12, darkAppearance: true), .dark)
-        XCTAssertEqual(LineStyle.paint(luminance: 0.20, darkAppearance: false), .dark)
+    func testDarkWallpaperGetsLightHairline() {
+        XCTAssertEqual(LineStyle.paint(luminance: 0.12, darkAppearance: true), .light)
+        XCTAssertEqual(LineStyle.paint(luminance: 0.20, darkAppearance: false), .light)
     }
 
-    func testLightWallpaperGetsLightHairline() {
-        XCTAssertEqual(LineStyle.paint(luminance: 0.80, darkAppearance: true), .light)
-        XCTAssertEqual(LineStyle.paint(luminance: 0.70, darkAppearance: false), .light)
+    func testLightWallpaperGetsDarkHairline() {
+        XCTAssertEqual(LineStyle.paint(luminance: 0.80, darkAppearance: true), .dark)
+        XCTAssertEqual(LineStyle.paint(luminance: 0.70, darkAppearance: false), .dark)
     }
 
     func testNightModeRaisesTheDarknessThreshold() {
-        XCTAssertEqual(LineStyle.paint(luminance: 0.46, darkAppearance: true), .dark)
-        XCTAssertEqual(LineStyle.paint(luminance: 0.46, darkAppearance: false), .light)
+        XCTAssertEqual(LineStyle.paint(luminance: 0.46, darkAppearance: true), .light)
+        XCTAssertEqual(LineStyle.paint(luminance: 0.46, darkAppearance: false), .dark)
     }
 
     func testTileCenterIsScreenCentered() {
@@ -510,6 +510,13 @@ final class DividerIconTests: XCTestCase {
         XCTAssertEqual(info["CFBundleIconFile"] as? String, "Line")
         XCTAssertNil(info["LSUIElement"])
         XCTAssertEqual(info["CFBundleIdentifier"] as? String, "llc.nextcitizen.ChromaDock.line.1")
+    }
+}
+
+final class WallpaperPathTests: XCTestCase {
+    func testWallpaperStoreIndexLivesInApplicationSupport() {
+        let path = Paths.wallpaperStoreIndex.path
+        XCTAssertTrue(path.contains("/Application Support/com.apple.wallpaper/Store/Index.plist"))
     }
 }
 
