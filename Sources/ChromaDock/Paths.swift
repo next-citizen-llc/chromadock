@@ -2,7 +2,16 @@ import Foundation
 
 enum Paths {
     static let appSupportName = "ChromaDock"
-    static let dividerBundlePrefix = "llc.nextcitizen.ChromaDock.divider."
+    /// Current helper bundle-id prefix. Bumped off `.divider.` so Dock
+    /// cannot keep serving the leftover ChromaDock `AppIcon.icns` cache.
+    static let dividerBundlePrefix = "llc.nextcitizen.ChromaDock.line."
+    static let legacyDividerBundlePrefixes = [
+        "llc.nextcitizen.ChromaDock.divider.",
+        "com.nextcz.dockdivider."
+    ]
+    static var allDividerBundlePrefixes: [String] {
+        [dividerBundlePrefix] + legacyDividerBundlePrefixes
+    }
     static let helperExecutableName = "ChromaDockDivider"
 
     static var appSupport: URL {

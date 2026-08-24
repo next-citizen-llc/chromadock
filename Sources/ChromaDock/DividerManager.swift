@@ -81,8 +81,8 @@ enum DividerManager {
             "CFBundleInfoDictionaryVersion": "6.0",
             "CFBundleName": "ChromaDock Divider \(index)",
             "CFBundlePackageType": "APPL",
-            "CFBundleShortVersionString": "1.0",
-            "CFBundleVersion": "1",
+            "CFBundleShortVersionString": "1.1",
+            "CFBundleVersion": "2",
             "LSMinimumSystemVersion": "14.0",
             "LSUIElement": true,
             "NSHighResolutionCapable": true
@@ -96,6 +96,10 @@ enum DividerManager {
             "--force", "--sign", "-", "--identifier", ident, app.path
         ])
         _ = try? DockIO.run("/usr/bin/xattr", ["-cr", app.path])
+        _ = try? DockIO.run(
+            "/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
+            ["-f", app.path]
+        )
         return app
     }
 
@@ -198,13 +202,10 @@ enum DividerManager {
     }
 
     static func dividerIndex(fromBundleID id: String) -> Int? {
-        if id.hasPrefix(Paths.dividerBundlePrefix),
-           let n = Int(id.dropFirst(Paths.dividerBundlePrefix.count)), n > 0 {
-            return n
-        }
-        let legacy = "com.nextcz.dockdivider."
-        if id.hasPrefix(legacy), let n = Int(id.dropFirst(legacy.count)), n > 0 {
-            return n
+        for prefix in Paths.allDividerBundlePrefixes {
+            if id.hasPrefix(prefix), let n = Int(id.dropFirst(prefix.count)), n > 0 {
+                return n
+            }
         }
         return nil
     }

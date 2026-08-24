@@ -264,10 +264,17 @@ final class RestoreDividerCountTests: XCTestCase {
 }
 
 final class HelperLaunchIdentityTests: XCTestCase {
+    func testOldAndNewDividerPrefixesAreRecognized() {
+        XCTAssertTrue(DockIO.isDividerTile(fileTile(bundle: "llc.nextcitizen.ChromaDock.line.1", label: "│")))
+        XCTAssertTrue(DockIO.isDividerTile(fileTile(bundle: "llc.nextcitizen.ChromaDock.divider.2", label: "│")))
+        XCTAssertTrue(DockIO.isDividerTile(fileTile(bundle: "com.nextcz.dockdivider.3", label: "│")))
+        XCTAssertFalse(DockIO.isDividerTile(fileTile(bundle: "com.apple.Safari", label: "Safari")))
+    }
+
     func testBundleIDFromHelperAppName() {
         XCTAssertEqual(
             DividerManager.bundleID(forHelperApp: URL(fileURLWithPath: "/tmp/Divider 3.app")),
-            "llc.nextcitizen.ChromaDock.divider.3"
+            "llc.nextcitizen.ChromaDock.line.3"
         )
         XCTAssertNil(DividerManager.bundleID(forHelperApp: URL(fileURLWithPath: "/tmp/Safari.app")))
         XCTAssertNil(DividerManager.bundleID(forHelperApp: URL(fileURLWithPath: "/tmp/Divider.app")))
@@ -306,6 +313,7 @@ final class DividerIconTests: XCTestCase {
         let info = try XCTUnwrap(obj as? [String: Any])
         XCTAssertEqual(info["CFBundleIconFile"] as? String, "DividerLine")
         XCTAssertEqual(info["LSUIElement"] as? Bool, true)
+        XCTAssertEqual(info["CFBundleIdentifier"] as? String, "llc.nextcitizen.ChromaDock.line.1")
     }
 }
 
