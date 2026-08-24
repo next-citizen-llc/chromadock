@@ -205,6 +205,19 @@ final class AppModel: ObservableObject {
         }
     }
 
+    func startDividerHelpersIfNeeded() {
+        guard settings.insertDividers, settings.keepDividersRunning else { return }
+        guard let items = try? FileManager.default.contentsOfDirectory(
+            at: Paths.dividersDir,
+            includingPropertiesForKeys: nil
+        ) else { return }
+        let urls = items
+            .filter { $0.pathExtension == "app" }
+            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+        guard !urls.isEmpty else { return }
+        DividerManager.launchHelpers(urls)
+    }
+
     func saveSettings() {
         do {
             let data = try JSONEncoder().encode(settings)
