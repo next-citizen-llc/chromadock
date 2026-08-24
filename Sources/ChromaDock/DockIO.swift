@@ -57,8 +57,7 @@ enum DockIO {
     static func isDividerTile(_ tile: [String: Any]) -> Bool {
         if isNativeSpacer(tile) { return false }
         guard let b = bundleID(of: tile) else { return false }
-        return b.hasPrefix(Paths.dividerBundlePrefix)
-            || b.hasPrefix("com.nextcz.dockdivider.")
+        return Paths.allDividerBundlePrefixes.contains { b.hasPrefix($0) }
     }
 
     static func fileTile(bundle: String, label: String, path: String) -> [String: Any] {

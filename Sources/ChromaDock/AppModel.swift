@@ -434,7 +434,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    static let leadingSpacerAnchor = ""
+    nonisolated static let leadingSpacerAnchor = ""
 
     nonisolated static func buildPersistentApps(
         settings: AppSettings,
