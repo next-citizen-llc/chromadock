@@ -8,6 +8,7 @@ if args.contains("--help") || args.contains("-h") {
 
       (no args)     open the app
       --scan        read Dock icons and print the result
+      --filter Q    with --scan, keep apps whose name contains Q
       --apply       apply the saved grouping now
       --restore     restore the last Dock backup
       --help        show this help
@@ -29,6 +30,18 @@ if args.contains("--apply") || args.contains("--restore") || args.contains("--sc
             await model.refreshAsync()
         }
         fputs(model.status + "\n", stdout)
+        if args.contains("--scan") {
+            var listed = model.apps
+            if let i = args.firstIndex(of: "--filter"), args.count > i + 1 {
+                let q = args[i + 1].lowercased()
+                listed = listed.filter { $0.label.lowercased().contains(q) }
+            }
+            for app in listed {
+                let dock = app.inDock ? "dock" : "extra"
+                let group = model.settings.groups.first(where: { $0.id == app.groupID })?.title ?? app.groupID
+                fputs("\(group)\t\(app.label)\t\(app.bundleIdentifier)\t\(dock)\n", stdout)
+            }
+        }
         exit(model.apps.isEmpty && !args.contains("--restore") ? 1 : 0)
     }
     RunLoop.main.run()

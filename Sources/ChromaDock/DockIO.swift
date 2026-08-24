@@ -55,6 +55,32 @@ enum DockIO {
             || b.hasPrefix("com.nextcz.dockdivider.")
     }
 
+    static func fileTile(bundle: String, label: String, path: String) -> [String: Any] {
+        let trimmed = path.hasSuffix("/") ? String(path.dropLast()) : path
+        let url = URL(fileURLWithPath: trimmed, isDirectory: trimmed.hasSuffix(".app"))
+        var urlString = url.absoluteString
+        if trimmed.hasSuffix(".app"), !urlString.hasSuffix("/") { urlString += "/" }
+        var td: [String: Any] = [
+            "bundle-identifier": bundle,
+            "dock-extra": false,
+            "file-label": label,
+            "file-type": 41,
+            "is-beta": false,
+            "file-data": [
+                "_CFURLString": urlString,
+                "_CFURLStringType": 15
+            ]
+        ]
+        if let book = makeBookmark(path: trimmed) {
+            td["book"] = book
+        }
+        return [
+            "GUID": UInt32.random(in: 1...UInt32.max),
+            "tile-type": "file-tile",
+            "tile-data": td
+        ]
+    }
+
     static func makeBookmark(path: String) -> Data? {
         let url = URL(fileURLWithPath: path, isDirectory: true)
         return try? url.bookmarkData(options: .minimalBookmark, includingResourceValuesForKeys: nil, relativeTo: nil)

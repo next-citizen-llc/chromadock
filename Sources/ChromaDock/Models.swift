@@ -12,6 +12,7 @@ struct DockApp: Identifiable, Hashable, Codable, Sendable {
     var colorful: Bool
     var hex: String
     var groupID: String
+    var inDock: Bool
 
     var hueDegrees: Double { hue * 360 }
 }
@@ -68,7 +69,7 @@ enum Heuristic {
 
         let commBits = [
             "slack", "teams", "zoom", "whatsapp", "telegram", "discord", "signal",
-            "messages", "facetime", "mail", "outlook", "phone", "ichat"
+            "messages", "facetime", "mail", "outlook", "phone", "ichat", "bluebubbles"
         ]
         if commBits.contains(where: { b.contains($0) || l.contains($0) }) {
             return "communication"

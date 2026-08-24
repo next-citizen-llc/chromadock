@@ -5,6 +5,7 @@ struct ContentView: View {
     @EnvironmentObject var model: AppModel
     @State private var selectedGroup: String?
     @State private var renamingGroupID: String?
+    @State private var appQuery = ""
     @FocusState private var focusedRenameID: String?
 
     var body: some View {
@@ -30,8 +31,11 @@ struct ContentView: View {
         } detail: {
             VStack(alignment: .leading, spacing: 0) {
                 optionsBar
+                filterBar
                 Divider()
-                if let id = selectedGroup, let group = model.settings.groups.first(where: { $0.id == id }) {
+                if !appQueryTrimmed.isEmpty {
+                    filterResults
+                } else if let id = selectedGroup, let group = model.settings.groups.first(where: { $0.id == id }) {
                     groupDetail(group)
                 } else {
                     ContentUnavailableView(
@@ -134,6 +138,16 @@ struct ContentView: View {
         model.deleteGroup(id)
     }
 
+    private var appQueryTrimmed: String {
+        appQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var filteredApps: [DockApp] {
+        let q = appQueryTrimmed.lowercased()
+        guard !q.isEmpty else { return [] }
+        return model.apps.filter { $0.label.lowercased().contains(q) }
+    }
+
     private var optionsBar: some View {
         HStack(spacing: 16) {
             Toggle("Sort each group by hue", isOn: $model.settings.sortByHue)
@@ -153,6 +167,41 @@ struct ContentView: View {
         .padding(10)
     }
 
+    private var filterBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Filter apps", text: $appQuery)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel("Filter apps")
+            if !appQuery.isEmpty {
+                Button("Clear") { appQuery = "" }
+                    .controlSize(.small)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+    }
+
+    @ViewBuilder
+    private var filterResults: some View {
+        let matches = filteredApps
+        if matches.isEmpty {
+            ContentUnavailableView(
+                "No apps match",
+                systemImage: "magnifyingglass",
+                description: Text("Nothing named “\(appQueryTrimmed)”.")
+            )
+        } else {
+            List {
+                ForEach(matches) { app in
+                    appRow(app, showGroup: true)
+                }
+            }
+            .listStyle(.inset)
+        }
+    }
+
     @ViewBuilder
     private func groupDetail(_ group: DockGroup) -> some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -170,34 +219,48 @@ struct ContentView: View {
 
             List {
                 ForEach(model.apps.filter { $0.groupID == group.id }) { app in
-                    HStack(spacing: 10) {
-                        AppIconView(path: app.path)
-                            .frame(width: 28, height: 28)
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(Color(hex: app.hex))
-                            .frame(width: 14, height: 14)
-                            .overlay(RoundedRectangle(cornerRadius: 3).stroke(.secondary.opacity(0.4), lineWidth: 0.5))
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(app.label)
-                            Text(app.colorful ? String(format: "hue %.0f°", app.hueDegrees) : "gray")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Picker("Group", selection: Binding(
-                            get: { app.groupID },
-                            set: { model.assign(app, to: $0) }
-                        )) {
-                            ForEach(model.settings.groups) { g in
-                                Text(g.title).tag(g.id)
-                            }
-                        }
-                        .labelsHidden()
-                        .frame(width: 180)
-                    }
+                    appRow(app, showGroup: false)
                 }
             }
             .listStyle(.inset)
+        }
+    }
+
+    @ViewBuilder
+    private func appRow(_ app: DockApp, showGroup: Bool) -> some View {
+        let groupTitle = model.settings.groups.first(where: { $0.id == app.groupID })?.title
+        HStack(spacing: 10) {
+            AppIconView(path: app.path)
+                .frame(width: 28, height: 28)
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Color(hex: app.hex))
+                .frame(width: 14, height: 14)
+                .overlay(RoundedRectangle(cornerRadius: 3).stroke(.secondary.opacity(0.4), lineWidth: 0.5))
+            VStack(alignment: .leading, spacing: 1) {
+                Text(app.label)
+                HStack(spacing: 6) {
+                    if showGroup, let groupTitle {
+                        Text(groupTitle)
+                    }
+                    Text(app.colorful ? String(format: "hue %.0f°", app.hueDegrees) : "gray")
+                    if !app.inDock {
+                        Text("not in Dock")
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Picker("Group", selection: Binding(
+                get: { app.groupID },
+                set: { model.assign(app, to: $0) }
+            )) {
+                ForEach(model.settings.groups) { g in
+                    Text(g.title).tag(g.id)
+                }
+            }
+            .labelsHidden()
+            .frame(width: 180)
         }
     }
 }

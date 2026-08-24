@@ -36,10 +36,15 @@ final class AppModel: ObservableObject {
         defer { isBusy = false }
         let settings = self.settings
         do {
-            let rows = try await Task.detached(priority: .userInitiated) {
+            let dockRows = try await Task.detached(priority: .userInitiated) {
                 let dict = try DockIO.exportPlist()
                 return Self.dockRows(from: dict, settings: settings)
             }.value
+            let extras = Self.extraRows(
+                existingBundles: Set(dockRows.map(\.bundle)),
+                settings: settings
+            )
+            let rows = dockRows + extras
             var scanned: [DockApp] = []
             scanned.reserveCapacity(rows.count)
             for (index, row) in rows.enumerated() {
@@ -55,11 +60,17 @@ final class AppModel: ObservableObject {
                     value: sample?.val ?? 0,
                     colorful: sample?.colorful ?? false,
                     hex: sample?.hex ?? "#888888",
-                    groupID: row.groupID
+                    groupID: row.groupID,
+                    inDock: row.inDock
                 ))
             }
             apps = scanned
-            status = "\(scanned.count) Dock apps."
+            let extraCount = extras.count
+            if extraCount == 0 {
+                status = "\(scanned.count) Dock apps."
+            } else {
+                status = "\(scanned.count) apps (\(extraCount) not kept in Dock)."
+            }
         } catch {
             status = error.localizedDescription
         }
@@ -194,6 +205,7 @@ final class AppModel: ObservableObject {
         let bundle: String
         let path: String
         let groupID: String
+        let inDock: Bool
     }
 
     nonisolated private static func dockRows(from dict: [String: Any], settings: AppSettings) -> [DockRow] {
@@ -210,9 +222,94 @@ final class AppModel: ObservableObject {
             }
             let group = settings.assignments[bundle]
                 ?? Heuristic.suggestedGroup(bundle: bundle, label: label)
-            rows.append(DockRow(label: label, bundle: bundle, path: path, groupID: group))
+            rows.append(DockRow(label: label, bundle: bundle, path: path, groupID: group, inDock: true))
         }
         return rows
+    }
+
+    @MainActor
+    private static func extraRows(existingBundles: Set<String>, settings: AppSettings) -> [DockRow] {
+        var seen = existingBundles
+        var extras: [DockRow] = []
+        func consider(bundle: String, label: String, path: String) {
+            guard !bundle.isEmpty, !seen.contains(bundle) else { return }
+            guard !shouldSkipExtra(bundle: bundle, path: path) else { return }
+            seen.insert(bundle)
+            let group = settings.assignments[bundle]
+                ?? Heuristic.suggestedGroup(bundle: bundle, label: label)
+            extras.append(DockRow(label: label, bundle: bundle, path: path, groupID: group, inDock: false))
+        }
+
+        for app in NSWorkspace.shared.runningApplications {
+            guard app.activationPolicy == .regular else { continue }
+            guard let bundle = app.bundleIdentifier, let url = app.bundleURL else { continue }
+            consider(bundle: bundle, label: app.localizedName ?? bundle, path: url.path)
+        }
+        for agent in launchAgentApps() {
+            guard isUserAppPath(agent.path) else { continue }
+            consider(bundle: agent.bundle, label: agent.label, path: agent.path)
+        }
+        return extras
+    }
+
+    nonisolated private static func shouldSkipExtra(bundle: String, path: String) -> Bool {
+        if bundle == "com.apple.finder" || bundle == "com.apple.dock" { return true }
+        if bundle.hasPrefix(Paths.dividerBundlePrefix) || bundle.hasPrefix("com.nextcz.dockdivider.") { return true }
+        if path.contains("/Contents/Frameworks/") { return true }
+        return false
+    }
+
+    nonisolated private static func isUserAppPath(_ path: String) -> Bool {
+        path.hasPrefix("/Applications/")
+            || path.hasPrefix(NSHomeDirectory() + "/Applications/")
+    }
+
+    nonisolated private static func launchAgentApps() -> [(bundle: String, label: String, path: String)] {
+        let dir = URL(fileURLWithPath: NSHomeDirectory())
+            .appendingPathComponent("Library/LaunchAgents")
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: dir,
+            includingPropertiesForKeys: nil
+        ) else { return [] }
+        var result: [(bundle: String, label: String, path: String)] = []
+        for url in files where url.pathExtension == "plist" {
+            guard let data = try? Data(contentsOf: url),
+                  let obj = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil),
+                  let dict = obj as? [String: Any] else { continue }
+            var program = dict["Program"] as? String
+            if program == nil, let args = dict["ProgramArguments"] as? [String] {
+                program = args.first
+            }
+            guard let program, let appPath = appBundlePath(containing: program) else { continue }
+            let info = URL(fileURLWithPath: appPath).appendingPathComponent("Contents/Info.plist")
+            var bundle = (dict["AssociatedBundleIdentifiers"] as? [String])?.first ?? ""
+            var label = URL(fileURLWithPath: appPath).deletingPathExtension().lastPathComponent
+            if let infoData = try? Data(contentsOf: info),
+               let infoObj = try? PropertyListSerialization.propertyList(from: infoData, options: [], format: nil),
+               let infoDict = infoObj as? [String: Any] {
+                if bundle.isEmpty {
+                    bundle = (infoDict["CFBundleIdentifier"] as? String) ?? ""
+                }
+                label = (infoDict["CFBundleDisplayName"] as? String)
+                    ?? (infoDict["CFBundleName"] as? String)
+                    ?? label
+            }
+            if !bundle.isEmpty {
+                result.append((bundle, label, appPath))
+            }
+        }
+        return result
+    }
+
+    nonisolated private static func appBundlePath(containing executable: String) -> String? {
+        let path = executable
+        guard let range = path.range(of: ".app", options: [.caseInsensitive]) else { return nil }
+        let appPath = String(path[..<range.upperBound])
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: appPath, isDirectory: &isDir), isDir.boolValue else {
+            return nil
+        }
+        return appPath
     }
 
     nonisolated static func applyArrangement(settings: AppSettings, apps: [DockApp]) throws -> URL {
@@ -253,6 +350,12 @@ final class AppModel: ObservableObject {
             for app in members {
                 if let tile = byBundle[app.bundleIdentifier] {
                     newApps.append(tile)
+                } else if settings.assignments[app.bundleIdentifier] != nil, !app.path.isEmpty {
+                    newApps.append(DockIO.fileTile(
+                        bundle: app.bundleIdentifier,
+                        label: app.label,
+                        path: app.path
+                    ))
                 }
             }
         }
