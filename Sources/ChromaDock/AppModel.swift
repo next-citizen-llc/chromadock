@@ -124,7 +124,8 @@ final class AppModel: ObservableObject {
         Task { await applyAsync() }
     }
 
-    func applyAsync() async {
+    @discardableResult
+    func applyAsync() async -> Bool {
         isBusy = true
         status = "Applying Dock arrangement…"
         defer { isBusy = false }
@@ -136,8 +137,10 @@ final class AppModel: ObservableObject {
             lastBackupURL = backup
             status = "Dock updated. Backup saved."
             await refreshAsync()
+            return true
         } catch {
             status = error.localizedDescription
+            return false
         }
     }
 
@@ -145,10 +148,11 @@ final class AppModel: ObservableObject {
         Task { await restoreAsync() }
     }
 
-    func restoreAsync() async {
+    @discardableResult
+    func restoreAsync() async -> Bool {
         guard let url = lastBackupURL, FileManager.default.fileExists(atPath: url.path) else {
             status = "No backup to restore."
-            return
+            return false
         }
         isBusy = true
         status = "Restoring previous Dock…"
@@ -160,8 +164,10 @@ final class AppModel: ObservableObject {
             }.value
             status = "Restored previous Dock."
             await refreshAsync()
+            return true
         } catch {
             status = error.localizedDescription
+            return false
         }
     }
 
@@ -312,7 +318,24 @@ final class AppModel: ObservableObject {
         return appPath
     }
 
+    enum DockApplyError: LocalizedError {
+        case emptyScan
+        case noAppTiles
+
+        var errorDescription: String? {
+            switch self {
+            case .emptyScan:
+                return "Scan produced no Dock apps; apply aborted to avoid wiping the Dock."
+            case .noAppTiles:
+                return "Arrangement produced no app tiles; apply aborted."
+            }
+        }
+    }
+
     nonisolated static func applyArrangement(settings: AppSettings, apps: [DockApp]) throws -> URL {
+        guard apps.contains(where: { $0.inDock }) else {
+            throw DockApplyError.emptyScan
+        }
         let dict = try DockIO.exportPlist()
         let backup = try DockIO.writeBackup(dict)
         let current = DockIO.persistentApps(dict)
@@ -358,6 +381,11 @@ final class AppModel: ObservableObject {
                     ))
                 }
             }
+        }
+
+        let realTiles = newApps.filter { !DockIO.isDividerTile($0) }
+        guard !realTiles.isEmpty else {
+            throw DockApplyError.noAppTiles
         }
 
         var next = dict
