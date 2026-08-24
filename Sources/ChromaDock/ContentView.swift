@@ -29,24 +29,23 @@ struct ContentView: View {
             }
             .navigationTitle("Groups")
         } detail: {
-            VStack(alignment: .leading, spacing: 0) {
-                optionsBar
-                filterBar
-                Divider()
-                if !appQueryTrimmed.isEmpty {
-                    filterResults
-                } else if let id = selectedGroup, let group = model.settings.groups.first(where: { $0.id == id }) {
-                    groupDetail(group)
-                } else {
-                    ContentUnavailableView(
-                        "Select a group",
-                        systemImage: "rectangle.split.3x1",
-                        description: Text("Scan the Dock, then assign apps to groups. Apply writes the new order.")
-                    )
+            appList
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    VStack(spacing: 0) {
+                        optionsBar
+                        filterBar
+                        if appQueryTrimmed.isEmpty, let id = selectedGroup,
+                           let group = model.settings.groups.first(where: { $0.id == id }) {
+                            groupNameBar(group)
+                        }
+                        Divider()
+                    }
+                    .background(.bar)
                 }
-            }
         }
         .navigationTitle("ChromaDock")
+        .toolbarTitleDisplayMode(.inline)
+        .toolbarBackground(.visible, for: .windowToolbar)
         .toolbar {
             ToolbarItem(placement: .automatic) {
                 Button("Scan Dock", action: model.refresh)
@@ -183,47 +182,48 @@ struct ContentView: View {
         .padding(.vertical, 6)
     }
 
-    @ViewBuilder
-    private var filterResults: some View {
-        let matches = filteredApps
-        if matches.isEmpty {
-            ContentUnavailableView(
-                "No apps match",
-                systemImage: "magnifyingglass",
-                description: Text("Nothing named “\(appQueryTrimmed)”.")
-            )
-        } else {
-            List {
-                ForEach(matches) { app in
-                    appRow(app, showGroup: true)
-                }
+    private var displayedApps: [DockApp] {
+        if !appQueryTrimmed.isEmpty { return filteredApps }
+        guard let id = selectedGroup else { return [] }
+        return model.apps.filter { $0.groupID == id }
+    }
+
+    private var appList: some View {
+        List {
+            ForEach(displayedApps) { app in
+                appRow(app, showGroup: !appQueryTrimmed.isEmpty)
             }
-            .listStyle(.inset)
+        }
+        .listStyle(.inset)
+        .overlay {
+            if !appQueryTrimmed.isEmpty, filteredApps.isEmpty {
+                ContentUnavailableView(
+                    "No apps match",
+                    systemImage: "magnifyingglass",
+                    description: Text("Nothing named “\(appQueryTrimmed)”.")
+                )
+            } else if appQueryTrimmed.isEmpty, selectedGroup == nil {
+                ContentUnavailableView(
+                    "Select a group",
+                    systemImage: "rectangle.split.3x1",
+                    description: Text("Scan the Dock, then assign apps to groups. Apply writes the new order.")
+                )
+            }
         }
     }
 
-    @ViewBuilder
-    private func groupDetail(_ group: DockGroup) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                TextField("Group name", text: Binding(
-                    get: { group.title },
-                    set: { model.renameGroup(group.id, title: $0) }
-                ))
-                .textFieldStyle(.roundedBorder)
-                .frame(maxWidth: 280)
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
-
-            List {
-                ForEach(model.apps.filter { $0.groupID == group.id }) { app in
-                    appRow(app, showGroup: false)
-                }
-            }
-            .listStyle(.inset)
+    private func groupNameBar(_ group: DockGroup) -> some View {
+        HStack {
+            TextField("Group name", text: Binding(
+                get: { group.title },
+                set: { model.renameGroup(group.id, title: $0) }
+            ))
+            .textFieldStyle(.roundedBorder)
+            .frame(maxWidth: 280)
+            Spacer()
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     @ViewBuilder
