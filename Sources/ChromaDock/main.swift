@@ -36,7 +36,7 @@ if args.contains("--apply") || args.contains("--restore") || args.contains("--sc
             var listed = model.apps
             if let i = args.firstIndex(of: "--filter"), args.count > i + 1 {
                 let q = args[i + 1].lowercased()
-                listed = listed.filter { $0.label.lowercased().contains(q) }
+                listed = listed.filter { AppNameFilter.containsName($0.label, query: q) }
             }
             for app in listed {
                 let dock = app.inDock ? "dock" : "extra"

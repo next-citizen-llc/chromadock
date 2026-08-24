@@ -1,6 +1,9 @@
-.PHONY: all app dmg clean
+.PHONY: all app dmg test clean
 
 all: app dmg
+
+test:
+	./scripts/test.sh
 
 app:
 	./scripts/build.sh

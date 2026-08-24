@@ -142,9 +142,7 @@ struct ContentView: View {
     }
 
     private var filteredApps: [DockApp] {
-        let q = appQueryTrimmed.lowercased()
-        guard !q.isEmpty else { return [] }
-        return model.apps.filter { $0.label.lowercased().contains(q) }
+        model.apps.filter { AppNameFilter.containsName($0.label, query: appQuery) }
     }
 
     private var optionsBar: some View {
