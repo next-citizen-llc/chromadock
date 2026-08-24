@@ -125,6 +125,20 @@ final class BuildPersistentAppsTests: XCTestCase {
     }
 }
 
+final class DockIORunTests: XCTestCase {
+    func testRunDrainsStdoutLargerThanPipeBuffer() throws {
+        let data = try DockIO.run("/bin/sh", ["-c", "python3 -c 'import sys; sys.stdout.write(\"x\" * 120000)'"])
+        XCTAssertEqual(data.count, 120000)
+        XCTAssertEqual(data.first, UInt8(ascii: "x"))
+        XCTAssertEqual(data.last, UInt8(ascii: "x"))
+    }
+
+    func testRunDrainsLargeStderrWithoutDeadlock() throws {
+        let data = try DockIO.run("/bin/sh", ["-c", "python3 -c 'import sys; sys.stderr.write(\"y\" * 120000); sys.stdout.write(\"ok\")'"])
+        XCTAssertEqual(String(data: data, encoding: .utf8), "ok")
+    }
+}
+
 private func fixtureApp(label: String, bundle: String, group: String, inDock: Bool) -> DockApp {
     DockApp(
         label: label,
