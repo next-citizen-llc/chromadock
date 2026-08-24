@@ -87,7 +87,10 @@ struct ContentView: View {
             }
             groupTitleDraft = model.settings.groups.first(where: { $0.id == selectedGroup })?.title ?? ""
         }
-        .onChange(of: selectedGroup) { _, new in
+        .onChange(of: selectedGroup) { old, new in
+            if let old, old != new {
+                model.renameGroup(old, title: groupTitleDraft)
+            }
             if let renamingGroupID, renamingGroupID != new {
                 commitSidebarRename()
             }
