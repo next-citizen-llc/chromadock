@@ -324,24 +324,71 @@ final class HelperLaunchIdentityTests: XCTestCase {
     }
 }
 
+final class LineStyleTests: XCTestCase {
+    func testDarkWallpaperGetsLightHairline() {
+        XCTAssertEqual(LineStyle.paint(luminance: 0.12, darkAppearance: true), .light)
+        XCTAssertEqual(LineStyle.paint(luminance: 0.20, darkAppearance: false), .light)
+    }
+
+    func testLightWallpaperGetsDarkHairline() {
+        XCTAssertEqual(LineStyle.paint(luminance: 0.80, darkAppearance: true), .dark)
+        XCTAssertEqual(LineStyle.paint(luminance: 0.70, darkAppearance: false), .dark)
+    }
+
+    func testNightModeRaisesTheDarknessThreshold() {
+        XCTAssertEqual(LineStyle.paint(luminance: 0.46, darkAppearance: true), .light)
+        XCTAssertEqual(LineStyle.paint(luminance: 0.46, darkAppearance: false), .dark)
+    }
+
+    func testTileCenterIsScreenCentered() {
+        let x = LineStyle.tileCenterX(
+            visualIndex: 1,
+            tileCount: 3,
+            tileSize: 10,
+            spacing: 0,
+            screenWidth: 100
+        )
+        // tiles occupy 30pt starting at 35; index 1 center is 35+10+5=50
+        XCTAssertEqual(x, 50, accuracy: 0.01)
+    }
+}
+
+final class WallpaperSamplerTests: XCTestCase {
+    func testSamplesLeftDarkAndRightLight() throws {
+        let image = try XCTUnwrap(makeSplitImage(width: 100, height: 40))
+        let screen = CGSize(width: 100, height: 40)
+        let left = WallpaperSampler.meanLuminance(
+            of: image,
+            screenSize: screen,
+            sampleInScreen: CGRect(x: 5, y: 0, width: 20, height: 20)
+        )
+        let right = WallpaperSampler.meanLuminance(
+            of: image,
+            screenSize: screen,
+            sampleInScreen: CGRect(x: 75, y: 0, width: 20, height: 20)
+        )
+        XCTAssertNotNil(left)
+        XCTAssertNotNil(right)
+        XCTAssertLessThan(left ?? 1, 0.08)
+        XCTAssertGreaterThan(right ?? 0, 0.90)
+    }
+
+    func testAspectFillCentersAWideImage() {
+        let frame = WallpaperSampler.aspectFillFrame(
+            imageSize: CGSize(width: 200, height: 50),
+            canvas: CGSize(width: 100, height: 50)
+        )
+        XCTAssertEqual(frame.origin.x, -50, accuracy: 0.01)
+        XCTAssertEqual(frame.width, 200, accuracy: 0.01)
+        XCTAssertEqual(frame.height, 50, accuracy: 0.01)
+    }
+}
+
 final class DividerIconTests: XCTestCase {
-    func testHairlinePNGIsOpaquePNG() throws {
+    func testHairlinePNGIsPNG() throws {
         let data = try DividerManager.hairlinePNG(pixelSize: 128)
         XCTAssertGreaterThan(data.count, 32)
         XCTAssertEqual(Array(data.prefix(8)), [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
-        let src = CGImageSourceCreateWithData(data as CFData, nil)
-        let image = src.flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) }
-        XCTAssertNotNil(image)
-        XCTAssertEqual(image?.width, 128)
-        let center = image.flatMap { img -> UInt8? in
-            guard let data = img.dataProvider?.data else { return nil }
-            let ptr = CFDataGetBytePtr(data)
-            let bpr = img.bytesPerRow
-            let off = (64 * bpr) + (64 * 4)
-            return ptr?[off]
-        }
-        XCTAssertNotNil(center)
-        XCTAssertLessThan(center ?? 255, 80)
     }
 
     func testInstallHelperReplacesStaleBrandIconWithHairline() throws {
@@ -369,7 +416,7 @@ final class DividerIconTests: XCTestCase {
         let obj = try PropertyListSerialization.propertyList(from: infoData, options: [], format: nil)
         let info = try XCTUnwrap(obj as? [String: Any])
         XCTAssertEqual(info["CFBundleIconFile"] as? String, "Hairline")
-        XCTAssertEqual(info["LSUIElement"] as? Bool, true)
+        XCTAssertNil(info["LSUIElement"])
         XCTAssertEqual(info["CFBundleIdentifier"] as? String, "llc.nextcitizen.ChromaDock.line.1")
     }
 }
@@ -423,6 +470,36 @@ private func fixtureApp(label: String, bundle: String, group: String, inDock: Bo
         hex: "#000000",
         groupID: group,
         inDock: inDock
+    )
+}
+
+private func makeSplitImage(width: Int, height: Int) -> CGImage? {
+    var pixels = [UInt8](repeating: 0, count: width * height * 4)
+    for y in 0..<height {
+        for x in 0..<width {
+            let i = (y * width + x) * 4
+            let light = x >= width / 2
+            let v: UInt8 = light ? 255 : 0
+            pixels[i] = v
+            pixels[i + 1] = v
+            pixels[i + 2] = v
+            pixels[i + 3] = 255
+        }
+    }
+    let data = Data(pixels) as CFData
+    guard let provider = CGDataProvider(data: data) else { return nil }
+    return CGImage(
+        width: width,
+        height: height,
+        bitsPerComponent: 8,
+        bitsPerPixel: 32,
+        bytesPerRow: width * 4,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+        provider: provider,
+        decode: nil,
+        shouldInterpolate: false,
+        intent: .defaultIntent
     )
 }
 

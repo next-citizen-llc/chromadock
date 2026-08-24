@@ -84,12 +84,14 @@ glass plate. The working approach:
 
 - ChromaDock installs small helper apps (`llc.nextcitizen.ChromaDock.line.N`)
   into `~/Library/Application Support/ChromaDock/Lines/`.
-- Each helper bundle uses an **opaque hairline icon** (dark vertical bar on a
-  filled tile). Fully transparent artwork is replaced by Dock glass and the
-  line vanishes.
-- Helpers are `LSUIElement` agents. They do not show a running-app dot, appear
-  in ⌘-Tab, or steal the menu bar. **Keep lines drawn** relaunches them after
-  Apply; the hairline still shows if a helper is not running.
+- Each helper stays **running** and sets `NSDockTile.contentView` to a
+  transparent view that draws only a vertical hairline, so Dock glass shows
+  through. macOS then shows a running-app indicator (the black dot) under
+  each line — that is the platform cost of custom tile drawing.
+- The hairline color follows the wallpaper behind that tile: a light line on
+  dark regions (including night mode), a dark line on light regions. Helpers
+  restyle on appearance changes, space changes, wake, and once a day.
+- **Keep lines drawn** relaunches those helpers after Apply and at login.
 
 Open at login (optional) relaunches ChromaDock so it can start those helpers
 again after a reboot.
