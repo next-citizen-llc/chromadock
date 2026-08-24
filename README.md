@@ -84,11 +84,11 @@ glass plate. The working approach:
 
 - ChromaDock installs small helper apps (`llc.nextcitizen.ChromaDock.divider.N`)
   into `~/Library/Application Support/ChromaDock/Dividers/`.
-- Each helper stays running and sets `NSDockTile.contentView` to a view that
-  draws only a vertical line, so Dock glass shows through.
-- macOS then shows a **running-app indicator** (the dot) under each line. That
-  is the platform cost of custom tile drawing. Turn off **Keep lines drawn**
-  if you would rather have blank spacers with no helpers.
+- Each helper bundle uses a mostly-transparent **hairline icon** as its Dock
+  artwork, so the line is the file-tile itself.
+- Helpers are `LSUIElement` agents. They do not show a running-app dot, appear
+  in ⌘-Tab, or steal the menu bar. **Keep lines drawn** relaunches them after
+  Apply; the hairline still shows if a helper is not running.
 
 Open at login (optional) relaunches ChromaDock so it can start those helpers
 again after a reboot.
