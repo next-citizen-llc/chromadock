@@ -197,6 +197,25 @@ enum DividerManager {
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
     }
 
+    static func dividerIndex(fromBundleID id: String) -> Int? {
+        if id.hasPrefix(Paths.dividerBundlePrefix),
+           let n = Int(id.dropFirst(Paths.dividerBundlePrefix.count)), n > 0 {
+            return n
+        }
+        let legacy = "com.nextcz.dockdivider."
+        if id.hasPrefix(legacy), let n = Int(id.dropFirst(legacy.count)), n > 0 {
+            return n
+        }
+        return nil
+    }
+
+    static func dividerCount(in tiles: [[String: Any]]) -> Int {
+        tiles.compactMap { tile -> Int? in
+            guard DockIO.isDividerTile(tile), let id = DockIO.bundleID(of: tile) else { return nil }
+            return dividerIndex(fromBundleID: id)
+        }.max() ?? 0
+    }
+
     static func bundleID(forHelperApp url: URL) -> String? {
         let name = url.deletingPathExtension().lastPathComponent
         guard name.hasPrefix("Divider "), let n = Int(name.dropFirst("Divider ".count)), n > 0 else {

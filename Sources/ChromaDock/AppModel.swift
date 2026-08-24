@@ -184,8 +184,18 @@ final class AppModel: ObservableObject {
         do {
             try await Task.detached(priority: .userInitiated) {
                 try DockIO.restore(from: url)
-                DividerManager.stopHelpers()
             }.value
+            DividerManager.stopHelpers()
+            let dict = try DockIO.exportPlist()
+            let needed = DividerManager.dividerCount(in: DockIO.persistentApps(dict))
+            if needed > 0 {
+                let urls = try DividerManager.ensureHelpers(count: needed)
+                if settings.keepDividersRunning {
+                    try await Task.sleep(nanoseconds: 1_600_000_000)
+                    _ = await DividerManager.launchHelpers(urls)
+                    startDividerHelpersIfNeeded()
+                }
+            }
             status = "Restored previous Dock."
             await refreshAsync()
             return true

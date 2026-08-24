@@ -182,6 +182,28 @@ final class BuildPersistentAppsTests: XCTestCase {
     }
 }
 
+final class RestoreDividerCountTests: XCTestCase {
+    func testDividerCountUsesHighestIndex() {
+        let tiles = [
+            fileTile(bundle: "com.apple.Safari", label: "Safari"),
+            fileTile(bundle: "llc.nextcitizen.ChromaDock.divider.1", label: "│"),
+            fileTile(bundle: "com.tinyspeck.slackmacgap", label: "Slack"),
+            fileTile(bundle: "llc.nextcitizen.ChromaDock.divider.4", label: "│")
+        ]
+        XCTAssertEqual(DividerManager.dividerCount(in: tiles), 4)
+        XCTAssertEqual(DividerManager.dividerIndex(fromBundleID: "com.nextcz.dockdivider.2"), 2)
+        XCTAssertNil(DividerManager.dividerIndex(fromBundleID: "com.apple.Safari"))
+    }
+
+    func testEmptyTilesNeedNoHelpers() {
+        XCTAssertEqual(DividerManager.dividerCount(in: []), 0)
+        XCTAssertEqual(
+            DividerManager.dividerCount(in: [fileTile(bundle: "com.apple.Safari", label: "Safari")]),
+            0
+        )
+    }
+}
+
 final class HelperLaunchIdentityTests: XCTestCase {
     func testBundleIDFromHelperAppName() {
         XCTAssertEqual(
