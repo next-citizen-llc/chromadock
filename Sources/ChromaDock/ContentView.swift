@@ -181,9 +181,11 @@ struct ContentView: View {
     }
 
     private var displayedApps: [DockApp] {
-        if !appQueryTrimmed.isEmpty { return filteredApps }
+        if !appQueryTrimmed.isEmpty {
+            return model.settings.sortByHue ? HueSampler.hueSorted(filteredApps) : filteredApps
+        }
         guard let id = selectedGroup else { return [] }
-        return model.apps.filter { $0.groupID == id }
+        return model.grouped.first(where: { $0.0.id == id })?.1 ?? []
     }
 
     private var appList: some View {

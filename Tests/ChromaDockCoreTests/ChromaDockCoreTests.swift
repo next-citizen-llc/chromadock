@@ -23,6 +23,20 @@ final class AppNameFilterTests: XCTestCase {
     }
 }
 
+final class HueSortTests: XCTestCase {
+    func testGrayThenHueOrder() {
+        let gray = fixtureApp(label: "Gray", bundle: "g", group: "other", inDock: true)
+        var red = fixtureApp(label: "Red", bundle: "r", group: "other", inDock: true)
+        red.colorful = true
+        red.hue = 0.0
+        var blue = fixtureApp(label: "Blue", bundle: "b", group: "other", inDock: true)
+        blue.colorful = true
+        blue.hue = 0.6
+        let sorted = HueSampler.hueSorted([blue, gray, red])
+        XCTAssertEqual(sorted.map(\.label), ["Gray", "Red", "Blue"])
+    }
+}
+
 final class HeuristicTests: XCTestCase {
     func testBlueBubblesServerIsCommunication() {
         XCTAssertEqual(
