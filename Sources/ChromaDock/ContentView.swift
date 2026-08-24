@@ -183,9 +183,20 @@ struct ContentView: View {
         HStack(spacing: 16) {
             Toggle("Sort each group by hue", isOn: $model.settings.sortByHue)
                 .onChange(of: model.settings.sortByHue) { _, _ in model.saveSettings() }
-            Toggle("Transparent divider lines", isOn: $model.settings.insertDividers)
+            Toggle("Dividers", isOn: $model.settings.insertDividers)
                 .onChange(of: model.settings.insertDividers) { _, _ in model.saveSettings() }
-            Toggle("Keep lines drawn", isOn: $model.settings.keepDividersRunning)
+            Picker("Style", selection: $model.settings.dividerStyle) {
+                Text("Lines").tag(DividerStyle.line)
+                Text("Dots").tag(DividerStyle.dots)
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 168)
+            .disabled(!model.settings.insertDividers)
+            .onChange(of: model.settings.dividerStyle) { _, _ in
+                model.dividerStyleDidChange()
+            }
+            .accessibilityLabel("Divider style")
+            Toggle("Keep dividers drawn", isOn: $model.settings.keepDividersRunning)
                 .onChange(of: model.settings.keepDividersRunning) { _, on in
                     model.saveSettings()
                     if on {

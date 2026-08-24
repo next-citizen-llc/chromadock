@@ -31,8 +31,45 @@ struct AppSettings: Codable, Sendable {
     var keepDividersRunning: Bool
     var openAtLogin: Bool
     var ungroupedID: String
+    var dividerStyle: DividerStyle
 
     static let ungroupedID = "other"
+
+    enum CodingKeys: String, CodingKey {
+        case groups, assignments, sortByHue, insertDividers, keepDividersRunning, openAtLogin, ungroupedID, dividerStyle
+    }
+
+    init(
+        groups: [DockGroup],
+        assignments: [String: String],
+        sortByHue: Bool,
+        insertDividers: Bool,
+        keepDividersRunning: Bool,
+        openAtLogin: Bool,
+        ungroupedID: String,
+        dividerStyle: DividerStyle = .line
+    ) {
+        self.groups = groups
+        self.assignments = assignments
+        self.sortByHue = sortByHue
+        self.insertDividers = insertDividers
+        self.keepDividersRunning = keepDividersRunning
+        self.openAtLogin = openAtLogin
+        self.ungroupedID = ungroupedID
+        self.dividerStyle = dividerStyle
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        groups = try c.decode([DockGroup].self, forKey: .groups)
+        assignments = try c.decode([String: String].self, forKey: .assignments)
+        sortByHue = try c.decode(Bool.self, forKey: .sortByHue)
+        insertDividers = try c.decode(Bool.self, forKey: .insertDividers)
+        keepDividersRunning = try c.decode(Bool.self, forKey: .keepDividersRunning)
+        openAtLogin = try c.decode(Bool.self, forKey: .openAtLogin)
+        ungroupedID = try c.decode(String.self, forKey: .ungroupedID)
+        dividerStyle = try c.decodeIfPresent(DividerStyle.self, forKey: .dividerStyle) ?? .line
+    }
 
     static var `default`: AppSettings {
         AppSettings(
@@ -49,7 +86,8 @@ struct AppSettings: Codable, Sendable {
             insertDividers: true,
             keepDividersRunning: true,
             openAtLogin: false,
-            ungroupedID: ungroupedID
+            ungroupedID: ungroupedID,
+            dividerStyle: .line
         )
     }
 }

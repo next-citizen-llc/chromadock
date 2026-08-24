@@ -18,6 +18,9 @@ swiftc -O \
   -framework AppKit -framework ImageIO \
   "$ROOT/Sources/ChromaDock/LineStyle.swift" \
   "$ROOT/Sources/ChromaDock/WallpaperSampler.swift" \
+  "$ROOT/Sources/ChromaDock/DividerMark.swift" \
+  "$ROOT/Sources/ChromaDock/Paths.swift" \
+  "$ROOT/Sources/ChromaDock/Models.swift" \
   "$ROOT/Sources/DividerHelper/main.swift" \
   -o "$APP/Contents/MacOS/ChromaDockDivider"
 
