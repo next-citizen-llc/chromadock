@@ -454,8 +454,9 @@ final class AppModel: ObservableObject {
         try DockIO.importPlist(next)
         if settings.insertDividers && settings.keepDividersRunning {
             try await Task.sleep(nanoseconds: 1_600_000_000)
+            let helpers = helperURLs
             await MainActor.run {
-                DividerManager.launchHelpers(helperURLs)
+                DividerManager.launchHelpers(helpers)
             }
         } else {
             DividerManager.stopHelpers()

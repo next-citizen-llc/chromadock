@@ -1,5 +1,9 @@
 import Foundation
 
+private final class PipeBuffer: @unchecked Sendable {
+    var data = Data()
+}
+
 enum DockIO {
     static func exportPlist() throws -> [String: Any] {
         let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("chromadock-export-\(UUID().uuidString).plist")
@@ -96,11 +100,25 @@ enum DockIO {
         proc.standardOutput = out
         proc.standardError = err
         try proc.run()
-        // Drain pipes before waitUntilExit. A Dock export is ~100 KB; waiting first
-        // deadlocks once stdout fills the ~64 KB pipe buffer.
-        let data = out.fileHandleForReading.readDataToEndOfFile()
-        let errData = err.fileHandleForReading.readDataToEndOfFile()
+        // Drain stdout and stderr concurrently. Waiting first, or draining
+        // sequentially, deadlocks once either pipe fills the ~64 KB buffer.
+        let outBox = PipeBuffer()
+        let errBox = PipeBuffer()
+        let group = DispatchGroup()
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            outBox.data = out.fileHandleForReading.readDataToEndOfFile()
+            group.leave()
+        }
+        group.enter()
+        DispatchQueue.global(qos: .userInitiated).async {
+            errBox.data = err.fileHandleForReading.readDataToEndOfFile()
+            group.leave()
+        }
+        group.wait()
         proc.waitUntilExit()
+        let data = outBox.data
+        let errData = errBox.data
         if proc.terminationStatus != 0 {
             let message = String(data: errData, encoding: .utf8) ?? "command failed"
             throw NSError(domain: "ChromaDock", code: Int(proc.terminationStatus), userInfo: [NSLocalizedDescriptionKey: message])
