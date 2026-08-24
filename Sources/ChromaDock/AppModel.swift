@@ -41,10 +41,24 @@ final class AppModel: ObservableObject {
         do {
             let packed = try await Task.detached(priority: .userInitiated) {
                 let dict = try DockIO.exportPlist()
-                let dock = Self.dockRows(from: dict, settings: settings)
-                let agents = Self.agentRows(existingBundles: Set(dock.map(\.bundle)), settings: settings)
-                return (dock: dock, agents: agents)
+                var next = settings
+                let live = Self.assignmentsFromDock(tiles: DockIO.persistentApps(dict), groups: next.groups)
+                if !live.isEmpty {
+                    for (bundle, groupID) in live {
+                        next.assignments[bundle] = groupID
+                    }
+                    next.dockSnapshot = live
+                }
+                let dock = Self.dockRows(from: dict, settings: next)
+                let agents = Self.agentRows(existingBundles: Set(dock.map(\.bundle)), settings: next)
+                return (dock: dock, agents: agents, settings: next)
             }.value
+            if packed.settings.dockSnapshot != settings.dockSnapshot
+                || packed.settings.assignments != settings.assignments {
+                self.settings.assignments = packed.settings.assignments
+                self.settings.dockSnapshot = packed.settings.dockSnapshot
+                saveSettings()
+            }
             let running = Self.runningAppRows(
                 existingBundles: Set(packed.dock.map(\.bundle) + packed.agents.map(\.bundle)),
                 settings: settings
@@ -150,11 +164,16 @@ final class AppModel: ObservableObject {
         isBusy = true
         status = "Applying Dock arrangement…"
         defer { isBusy = false }
-        await refreshAsync(updateBusy: false)
+        if apps.isEmpty {
+            await refreshAsync(updateBusy: false)
+        }
         let snapshot = (settings: settings, apps: apps)
         do {
             let outcome = try await Self.applyArrangement(settings: snapshot.settings, apps: snapshot.apps)
             lastBackupURL = outcome.backup
+            settings.assignments = outcome.settings.assignments
+            settings.dockSnapshot = outcome.settings.dockSnapshot
+            saveSettings()
             if outcome.helpersExpected > 0, outcome.helpersRunning < outcome.helpersExpected {
                 status = "Dock updated. \(outcome.helpersRunning) of \(outcome.helpersExpected) divider lines running."
             } else {
@@ -456,6 +475,52 @@ final class AppModel: ObservableObject {
         return settings.ungroupedID
     }
 
+    /// Divider-separated Dock sections map onto `groups` in order. Empty if
+    /// the live Dock has no ChromaDock dividers (cannot see user sections).
+    nonisolated static func assignmentsFromDock(tiles: [[String: Any]], groups: [DockGroup]) -> [String: String] {
+        guard !groups.isEmpty, tiles.contains(where: { DockIO.isDividerTile($0) }) else {
+            return [:]
+        }
+        var section = 0
+        var result: [String: String] = [:]
+        for tile in tiles {
+            if DockIO.isDividerTile(tile) {
+                section += 1
+                continue
+            }
+            if DockIO.isNativeSpacer(tile) { continue }
+            guard let bundle = DockIO.bundleID(of: tile) else { continue }
+            let groupID = section < groups.count ? groups[section].id : groups[groups.count - 1].id
+            result[bundle] = groupID
+        }
+        return result
+    }
+
+    /// Live Dock section wins unless the user picked a different group in the
+    /// app since the last Scan (`assignments` differs from `dockSnapshot`).
+    nonisolated static func adoptDockMembership(
+        settings: AppSettings,
+        apps: [DockApp],
+        tiles: [[String: Any]]
+    ) -> (settings: AppSettings, apps: [DockApp]) {
+        let live = assignmentsFromDock(tiles: tiles, groups: settings.groups)
+        guard !live.isEmpty else { return (settings, apps) }
+        var nextSettings = settings
+        var nextApps = apps
+        for i in nextApps.indices where nextApps[i].inDock {
+            let bundle = nextApps[i].bundleIdentifier
+            guard let liveGroup = live[bundle] else { continue }
+            let assigned = nextSettings.assignments[bundle]
+            let previous = nextSettings.dockSnapshot[bundle]
+            let uiChanged = assigned != nil && assigned != previous
+            let groupID = uiChanged ? assigned! : liveGroup
+            nextApps[i].groupID = groupID
+            nextSettings.assignments[bundle] = groupID
+        }
+        nextSettings.dockSnapshot = live
+        return (nextSettings, nextApps)
+    }
+
     nonisolated static func willEmitTile(_ app: DockApp, settings: AppSettings, dockedBundles: Set<String>) -> Bool {
         if dockedBundles.contains(app.bundleIdentifier) { return true }
         return settings.assignments[app.bundleIdentifier] != nil && !app.path.isEmpty
@@ -573,12 +638,16 @@ final class AppModel: ObservableObject {
         let backup: URL
         let helpersExpected: Int
         let helpersRunning: Int
+        let settings: AppSettings
     }
 
     nonisolated static func applyArrangement(settings: AppSettings, apps: [DockApp]) async throws -> DockApplyOutcome {
         let dict = try DockIO.exportPlist()
         let backup = try DockIO.writeBackup(dict)
         let current = DockIO.persistentApps(dict)
+        let adopted = adoptDockMembership(settings: settings, apps: apps, tiles: current)
+        let settings = adopted.settings
+        let apps = adopted.apps
         var helperURLs: [URL] = []
         if settings.insertDividers {
             let dockedBundles = Set(current.compactMap { DockIO.isDividerTile($0) ? nil : DockIO.bundleID(of: $0) })
@@ -605,6 +674,11 @@ final class AppModel: ObservableObject {
             running = await DividerManager.launchHelpers(helpers)
         }
         let expected = (settings.insertDividers && settings.keepDividersRunning) ? helperURLs.count : 0
-        return DockApplyOutcome(backup: backup, helpersExpected: expected, helpersRunning: running)
+        return DockApplyOutcome(
+            backup: backup,
+            helpersExpected: expected,
+            helpersRunning: running,
+            settings: settings
+        )
     }
 }

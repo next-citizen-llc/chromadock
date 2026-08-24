@@ -33,11 +33,14 @@ struct AppSettings: Codable, Sendable {
     var openAtLogin: Bool
     var ungroupedID: String
     var dividerStyle: DividerStyle
+    /// Group each docked app sat in at the last Scan, keyed by bundle id.
+    /// Used so Apply can tell a live Dock drag from an in-app group pick.
+    var dockSnapshot: [String: String]
 
     static let ungroupedID = "other"
 
     enum CodingKeys: String, CodingKey {
-        case groups, assignments, sortByHue, insertDividers, keepDividersRunning, openAtLogin, ungroupedID, dividerStyle
+        case groups, assignments, sortByHue, insertDividers, keepDividersRunning, openAtLogin, ungroupedID, dividerStyle, dockSnapshot
     }
 
     init(
@@ -48,7 +51,8 @@ struct AppSettings: Codable, Sendable {
         keepDividersRunning: Bool,
         openAtLogin: Bool,
         ungroupedID: String,
-        dividerStyle: DividerStyle = .line
+        dividerStyle: DividerStyle = .line,
+        dockSnapshot: [String: String] = [:]
     ) {
         self.groups = groups
         self.assignments = assignments
@@ -58,6 +62,7 @@ struct AppSettings: Codable, Sendable {
         self.openAtLogin = openAtLogin
         self.ungroupedID = ungroupedID
         self.dividerStyle = dividerStyle
+        self.dockSnapshot = dockSnapshot
     }
 
     init(from decoder: Decoder) throws {
@@ -70,6 +75,7 @@ struct AppSettings: Codable, Sendable {
         openAtLogin = try c.decode(Bool.self, forKey: .openAtLogin)
         ungroupedID = try c.decode(String.self, forKey: .ungroupedID)
         dividerStyle = DividerStyle.fromStored(try c.decodeIfPresent(String.self, forKey: .dividerStyle))
+        dockSnapshot = try c.decodeIfPresent([String: String].self, forKey: .dockSnapshot) ?? [:]
     }
 
     static var `default`: AppSettings {

@@ -96,6 +96,85 @@ final class IconLuminanceTests: XCTestCase {
     }
 }
 
+final class DockSnapshotTests: XCTestCase {
+    func testAssignmentsFromDockFollowDividerSections() {
+        let tiles = [
+            fileTile(bundle: "com.apple.Terminal", label: "Terminal"),
+            fileTile(bundle: "llc.nextcitizen.ChromaDock.line.1", label: "│"),
+            fileTile(bundle: "com.apple.Safari", label: "Safari"),
+            fileTile(bundle: "llc.nextcitizen.ChromaDock.line.2", label: "│"),
+            fileTile(bundle: "com.tinyspeck.slackmacgap", label: "Slack")
+        ]
+        let map = AppModel.assignmentsFromDock(tiles: tiles, groups: AppSettings.default.groups)
+        XCTAssertEqual(map["com.apple.Terminal"], "system")
+        XCTAssertEqual(map["com.apple.Safari"], "development")
+        XCTAssertEqual(map["com.tinyspeck.slackmacgap"], "browsers")
+    }
+
+    func testAssignmentsFromDockEmptyWithoutDividers() {
+        let tiles = [
+            fileTile(bundle: "com.apple.Safari", label: "Safari"),
+            fileTile(bundle: "com.tinyspeck.slackmacgap", label: "Slack")
+        ]
+        XCTAssertEqual(AppModel.assignmentsFromDock(tiles: tiles, groups: AppSettings.default.groups), [:])
+    }
+
+    func testNativeSpacerDoesNotStartANewSection() {
+        let spacer: [String: Any] = ["GUID": UInt32(2), "tile-type": "small-spacer-tile", "tile-data": [:]]
+        let tiles = [
+            fileTile(bundle: "com.apple.Terminal", label: "Terminal"),
+            spacer,
+            fileTile(bundle: "com.apple.Safari", label: "Safari"),
+            fileTile(bundle: "llc.nextcitizen.ChromaDock.line.1", label: "│"),
+            fileTile(bundle: "com.tinyspeck.slackmacgap", label: "Slack")
+        ]
+        let map = AppModel.assignmentsFromDock(tiles: tiles, groups: AppSettings.default.groups)
+        XCTAssertEqual(map["com.apple.Terminal"], "system")
+        XCTAssertEqual(map["com.apple.Safari"], "system")
+        XCTAssertEqual(map["com.tinyspeck.slackmacgap"], "development")
+    }
+
+    func testAdoptKeepsInAppGroupPick() {
+        var settings = AppSettings.default
+        settings.assignments["com.apple.Safari"] = "media"
+        settings.dockSnapshot["com.apple.Safari"] = "browsers"
+        var safari = fixtureApp(label: "Safari", bundle: "com.apple.Safari", group: "media", inDock: true)
+        safari.groupID = "media"
+        let tiles = [
+            fileTile(bundle: "com.apple.Safari", label: "Safari"),
+            fileTile(bundle: "llc.nextcitizen.ChromaDock.line.1", label: "│"),
+            fileTile(bundle: "com.tinyspeck.slackmacgap", label: "Slack")
+        ]
+        let adopted = AppModel.adoptDockMembership(settings: settings, apps: [safari], tiles: tiles)
+        XCTAssertEqual(adopted.apps[0].groupID, "media")
+        XCTAssertEqual(adopted.settings.assignments["com.apple.Safari"], "media")
+    }
+
+    func testAdoptTakesLiveDockMoveWhenNoNewerInAppPick() {
+        var settings = AppSettings.default
+        settings.assignments["com.apple.Safari"] = "browsers"
+        settings.dockSnapshot["com.apple.Safari"] = "browsers"
+        let safari = fixtureApp(label: "Safari", bundle: "com.apple.Safari", group: "browsers", inDock: true)
+        let tiles = [
+            fileTile(bundle: "com.apple.Terminal", label: "Terminal"),
+            fileTile(bundle: "llc.nextcitizen.ChromaDock.line.1", label: "│"),
+            fileTile(bundle: "com.apple.Safari", label: "Safari")
+        ]
+        let adopted = AppModel.adoptDockMembership(settings: settings, apps: [safari], tiles: tiles)
+        XCTAssertEqual(adopted.apps[0].groupID, "development")
+        XCTAssertEqual(adopted.settings.assignments["com.apple.Safari"], "development")
+    }
+
+    func testMissingDockSnapshotDecodesEmpty() throws {
+        let encoded = try JSONEncoder().encode(AppSettings.default)
+        var obj = try XCTUnwrap(try JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        obj.removeValue(forKey: "dockSnapshot")
+        let data = try JSONSerialization.data(withJSONObject: obj)
+        let decoded = try JSONDecoder().decode(AppSettings.self, from: data)
+        XCTAssertEqual(decoded.dockSnapshot, [:])
+    }
+}
+
 final class HeuristicTests: XCTestCase {
     func testBlueBubblesServerIsCommunication() {
         XCTAssertEqual(
