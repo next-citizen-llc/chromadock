@@ -122,15 +122,14 @@ final class AppModel: ObservableObject {
     func deleteGroup(_ id: String) {
         guard id != settings.ungroupedID else { return }
         settings.groups.removeAll { $0.id == id }
-        for i in apps.indices where apps[i].groupID == id {
-            apps[i].groupID = settings.ungroupedID
-        }
-        settings.assignments = Self.rewriteAssignmentsAfterDelete(
+        let next = Self.applyingDeleteGroup(
             deletedGroupID: id,
             ungroupedID: settings.ungroupedID,
             apps: apps,
             assignments: settings.assignments
         )
+        apps = next.apps
+        settings.assignments = next.assignments
         saveSettings()
     }
 
@@ -346,16 +345,31 @@ final class AppModel: ObservableObject {
     nonisolated static func rewriteAssignmentsAfterDelete(
         deletedGroupID: String,
         ungroupedID: String,
-        apps: [DockApp],
         assignments: [String: String]
     ) -> [String: String] {
         var next = assignments
-        for app in apps where app.groupID == deletedGroupID {
-            if next[app.bundleIdentifier] != nil {
-                next[app.bundleIdentifier] = ungroupedID
-            }
+        for (bundle, groupID) in assignments where groupID == deletedGroupID {
+            next[bundle] = ungroupedID
         }
         return next
+    }
+
+    nonisolated static func applyingDeleteGroup(
+        deletedGroupID: String,
+        ungroupedID: String,
+        apps: [DockApp],
+        assignments: [String: String]
+    ) -> (apps: [DockApp], assignments: [String: String]) {
+        let nextAssign = rewriteAssignmentsAfterDelete(
+            deletedGroupID: deletedGroupID,
+            ungroupedID: ungroupedID,
+            assignments: assignments
+        )
+        var nextApps = apps
+        for i in nextApps.indices where nextApps[i].groupID == deletedGroupID {
+            nextApps[i].groupID = ungroupedID
+        }
+        return (nextApps, nextAssign)
     }
 
     nonisolated static func willEmitTile(_ app: DockApp, settings: AppSettings, dockedBundles: Set<String>) -> Bool {

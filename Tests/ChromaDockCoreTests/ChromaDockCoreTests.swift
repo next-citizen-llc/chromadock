@@ -67,25 +67,33 @@ final class WillEmitTileTests: XCTestCase {
 
 final class DeleteGroupAssignmentTests: XCTestCase {
     func testHeuristicMemberDoesNotGainAssignment() {
-        let extra = fixtureApp(label: "BlueBubbles", bundle: "com.BlueBubbles.BlueBubbles-Server", group: "media", inDock: false)
         let next = AppModel.rewriteAssignmentsAfterDelete(
             deletedGroupID: "media",
             ungroupedID: "other",
-            apps: [extra],
             assignments: [:]
         )
         XCTAssertNil(next["com.BlueBubbles.BlueBubbles-Server"])
     }
 
     func testExplicitMemberIsRewrittenToUngrouped() {
-        let extra = fixtureApp(label: "Handy", bundle: "com.pais.handy", group: "media", inDock: false)
         let next = AppModel.rewriteAssignmentsAfterDelete(
+            deletedGroupID: "media",
+            ungroupedID: "other",
+            assignments: ["com.pais.handy": "media"]
+        )
+        XCTAssertEqual(next["com.pais.handy"], "other")
+    }
+
+    func testApplyingDeleteGroupRewritesAssignmentAfterMovingAppToUngrouped() {
+        let extra = fixtureApp(label: "Handy", bundle: "com.pais.handy", group: "media", inDock: false)
+        let result = AppModel.applyingDeleteGroup(
             deletedGroupID: "media",
             ungroupedID: "other",
             apps: [extra],
             assignments: ["com.pais.handy": "media"]
         )
-        XCTAssertEqual(next["com.pais.handy"], "other")
+        XCTAssertEqual(result.apps.map(\.groupID), ["other"])
+        XCTAssertEqual(result.assignments["com.pais.handy"], "other")
     }
 }
 
