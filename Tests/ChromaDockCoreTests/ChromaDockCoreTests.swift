@@ -409,13 +409,14 @@ final class DividerIconTests: XCTestCase {
         let resources = app.appendingPathComponent("Contents/Resources")
         XCTAssertFalse(fm.fileExists(atPath: resources.appendingPathComponent("AppIcon.icns").path))
         XCTAssertFalse(fm.fileExists(atPath: resources.appendingPathComponent("DividerLine.icns").path))
-        XCTAssertTrue(fm.fileExists(atPath: resources.appendingPathComponent("Hairline.icns").path))
+        XCTAssertFalse(fm.fileExists(atPath: resources.appendingPathComponent("Hairline.icns").path))
+        XCTAssertTrue(fm.fileExists(atPath: resources.appendingPathComponent("Line.icns").path))
 
         let infoURL = app.appendingPathComponent("Contents/Info.plist")
         let infoData = try Data(contentsOf: infoURL)
         let obj = try PropertyListSerialization.propertyList(from: infoData, options: [], format: nil)
         let info = try XCTUnwrap(obj as? [String: Any])
-        XCTAssertEqual(info["CFBundleIconFile"] as? String, "Hairline")
+        XCTAssertEqual(info["CFBundleIconFile"] as? String, "Line")
         XCTAssertNil(info["LSUIElement"])
         XCTAssertEqual(info["CFBundleIdentifier"] as? String, "llc.nextcitizen.ChromaDock.line.1")
     }
@@ -424,6 +425,15 @@ final class DividerIconTests: XCTestCase {
 final class LegacyDividerCleanupTests: XCTestCase {
     func testLegacyArtifactPaths() {
         let home = URL(fileURLWithPath: "/Users/example", isDirectory: true)
+        XCTAssertEqual(DividerManager.linesLaunchAgentLabel, "llc.nextcitizen.ChromaDock.lines")
+        XCTAssertEqual(
+            DividerManager.linesLaunchAgentPlist(home: home).path,
+            "/Users/example/Library/LaunchAgents/llc.nextcitizen.ChromaDock.lines.plist"
+        )
+        XCTAssertEqual(
+            DividerManager.linesKeepScript(home: home).path,
+            "/Users/example/Library/Application Support/ChromaDock/keep-lines.sh"
+        )
         XCTAssertEqual(DividerManager.legacyLaunchAgentLabel, "com.nextcz.dock-dividers")
         XCTAssertEqual(
             DividerManager.legacyLaunchAgentPlist(home: home).path,

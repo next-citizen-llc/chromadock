@@ -12,6 +12,7 @@ final class AppModel: ObservableObject {
     @Published var lastBackupURL: URL?
     @Published var isBusy = false
     private var helperKeepAlive: Task<Void, Never>?
+    private var helperTerminateObserver: NSObjectProtocol?
 
     init() {
         self.settings = Self.loadSettings()
@@ -227,6 +228,8 @@ final class AppModel: ObservableObject {
     func startDividerHelpersIfNeeded() {
         helperKeepAlive?.cancel()
         guard settings.insertDividers, settings.keepDividersRunning else { return }
+        DividerManager.installLinesLaunchAgent()
+        observeHelperTermination()
         helperKeepAlive = Task { @MainActor [weak self] in
             while !Task.isCancelled {
                 guard self != nil else { break }
@@ -234,7 +237,7 @@ final class AppModel: ObservableObject {
                 if !urls.isEmpty {
                     _ = await DividerManager.launchHelpers(urls)
                 }
-                try? await Task.sleep(nanoseconds: 15_000_000_000)
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
             }
         }
     }
@@ -242,7 +245,30 @@ final class AppModel: ObservableObject {
     func stopDividerKeepAlive() {
         helperKeepAlive?.cancel()
         helperKeepAlive = nil
+        if let helperTerminateObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(helperTerminateObserver)
+            self.helperTerminateObserver = nil
+        }
         DividerManager.stopHelpers()
+    }
+
+    private func observeHelperTermination() {
+        if helperTerminateObserver != nil { return }
+        helperTerminateObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didTerminateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { note in
+            guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                  let bid = app.bundleIdentifier, Paths.isDividerBundle(bid) else { return }
+            Task { @MainActor [weak self] in
+                guard let self, self.settings.insertDividers, self.settings.keepDividersRunning else { return }
+                let urls = DividerManager.installedHelperURLs().filter {
+                    DividerManager.bundleID(forHelperApp: $0) == bid
+                }
+                _ = await DividerManager.launchHelpers(urls.isEmpty ? DividerManager.installedHelperURLs() : urls)
+            }
+        }
     }
 
     func saveSettings() {

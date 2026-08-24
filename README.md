@@ -91,7 +91,9 @@ glass plate. The working approach:
 - The hairline color follows the wallpaper behind that tile: a dark line on
   dark regions (including night mode), a light line on light regions. Helpers
   restyle on appearance changes, space changes, wake, and once a day.
-- **Keep lines drawn** relaunches those helpers after Apply and at login.
+- **Keep lines drawn** relaunches those helpers after Apply, at login, and if
+  a helper is quit (immediate relaunch plus a LaunchAgent so the tile stays
+  a running hairline instead of falling back to an app-icon squircle).
 
 Open at login (optional) relaunches ChromaDock so it can start those helpers
 again after a reboot.
