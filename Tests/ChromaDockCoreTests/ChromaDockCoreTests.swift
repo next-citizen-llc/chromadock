@@ -182,6 +182,29 @@ final class BuildPersistentAppsTests: XCTestCase {
     }
 }
 
+final class LegacyDividerCleanupTests: XCTestCase {
+    func testLegacyArtifactPaths() {
+        let home = URL(fileURLWithPath: "/Users/example", isDirectory: true)
+        XCTAssertEqual(DividerManager.legacyLaunchAgentLabel, "com.nextcz.dock-dividers")
+        XCTAssertEqual(
+            DividerManager.legacyLaunchAgentPlist(home: home).path,
+            "/Users/example/Library/LaunchAgents/com.nextcz.dock-dividers.plist"
+        )
+        XCTAssertEqual(
+            DividerManager.legacyStartScript(home: home).path,
+            "/Users/example/Library/Application Support/dock-group-hue/start-dividers.sh"
+        )
+        XCTAssertEqual(
+            DividerManager.legacyApplicationsDir(home: home).path,
+            "/Users/example/Applications/Dock Dividers"
+        )
+        XCTAssertEqual(
+            DividerManager.legacySupportDir(home: home).path,
+            "/Users/example/Library/Application Support/dock-group-hue"
+        )
+    }
+}
+
 final class DockIORunTests: XCTestCase {
     func testRunDrainsStdoutLargerThanPipeBuffer() throws {
         let data = try DockIO.run("/bin/sh", ["-c", "python3 -c 'import sys; sys.stdout.write(\"x\" * 120000)'"])

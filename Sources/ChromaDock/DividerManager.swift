@@ -108,8 +108,46 @@ enum DividerManager {
         }
     }
 
+    static let legacyLaunchAgentLabel = "com.nextcz.dock-dividers"
+
+    static func legacyLaunchAgentPlist(home: URL) -> URL {
+        home.appendingPathComponent("Library/LaunchAgents/\(legacyLaunchAgentLabel).plist")
+    }
+
+    static func legacyStartScript(home: URL) -> URL {
+        home.appendingPathComponent("Library/Application Support/dock-group-hue/start-dividers.sh")
+    }
+
+    static func legacyApplicationsDir(home: URL) -> URL {
+        home.appendingPathComponent("Applications/Dock Dividers", isDirectory: true)
+    }
+
+    static func legacySupportDir(home: URL) -> URL {
+        home.appendingPathComponent("Library/Application Support/dock-group-hue", isDirectory: true)
+    }
+
     static func stopHelpers() {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        unloadLegacyLaunchAgent(home: home)
+        _ = try? DockIO.run("/usr/bin/pkill", ["-f", "dock-group-hue/start-dividers.sh"])
         _ = try? DockIO.run("/usr/bin/pkill", ["-x", Paths.helperExecutableName])
         _ = try? DockIO.run("/usr/bin/pkill", ["-f", "Dock Dividers/Divider .*\\.app/Contents/MacOS/divider"])
+        _ = try? DockIO.run("/usr/bin/pkill", ["-f", "dock-group-hue/dividers/Divider .*\\.app/Contents/MacOS/divider"])
+        removeLegacyInstalls(home: home)
+    }
+
+    static func unloadLegacyLaunchAgent(home: URL) {
+        let plist = legacyLaunchAgentPlist(home: home)
+        let uid = getuid()
+        _ = try? DockIO.run("/bin/launchctl", ["bootout", "gui/\(uid)/\(legacyLaunchAgentLabel)"])
+        if FileManager.default.fileExists(atPath: plist.path) {
+            _ = try? DockIO.run("/bin/launchctl", ["unload", plist.path])
+            try? FileManager.default.removeItem(at: plist)
+        }
+    }
+
+    static func removeLegacyInstalls(home: URL) {
+        try? FileManager.default.removeItem(at: legacyApplicationsDir(home: home))
+        try? FileManager.default.removeItem(at: legacySupportDir(home: home))
     }
 }
