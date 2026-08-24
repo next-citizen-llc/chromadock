@@ -9,6 +9,7 @@ struct ChromaDockApp: App {
                 .environmentObject(model)
         }
         .windowStyle(.automatic)
+        .windowToolbarStyle(.unifiedCompact)
         .defaultSize(width: 880, height: 560)
         .commands {
             CommandGroup(replacing: .newItem) {}
