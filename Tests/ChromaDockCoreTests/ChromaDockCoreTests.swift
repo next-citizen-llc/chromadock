@@ -133,6 +133,47 @@ final class BuildPersistentAppsTests: XCTestCase {
         XCTAssertFalse(built.contains { DockIO.isDividerTile($0) })
     }
 
+    func testLeadingNativeSpacerIsKept() throws {
+        let safari = fixtureApp(label: "Safari", bundle: "com.apple.Safari", group: "browsers", inDock: true)
+        let spacer: [String: Any] = ["GUID": UInt32(9), "tile-type": "small-spacer-tile", "tile-data": [:]]
+        let current = [
+            spacer,
+            fileTile(bundle: "com.apple.Safari", label: "Safari")
+        ]
+        var settings = AppSettings.default
+        settings.insertDividers = false
+        let built = try AppModel.buildPersistentApps(
+            settings: settings,
+            apps: [safari],
+            current: current,
+            helperURLs: []
+        )
+        XCTAssertEqual(built.count, 2)
+        XCTAssertTrue(DockIO.isNativeSpacer(built[0]))
+        XCTAssertEqual(DockIO.bundleID(of: built[1]), "com.apple.Safari")
+    }
+
+    func testSpacerAfterSkippedDividerIsKept() throws {
+        let safari = fixtureApp(label: "Safari", bundle: "com.apple.Safari", group: "browsers", inDock: true)
+        let spacer: [String: Any] = ["GUID": UInt32(8), "tile-type": "small-spacer-tile", "tile-data": [:]]
+        let current = [
+            fileTile(bundle: "com.nextcz.dockdivider.1", label: "│"),
+            spacer,
+            fileTile(bundle: "com.apple.Safari", label: "Safari")
+        ]
+        var settings = AppSettings.default
+        settings.insertDividers = false
+        let built = try AppModel.buildPersistentApps(
+            settings: settings,
+            apps: [safari],
+            current: current,
+            helperURLs: []
+        )
+        XCTAssertTrue(DockIO.isNativeSpacer(built[0]))
+        XCTAssertEqual(DockIO.bundleID(of: built[1]), "com.apple.Safari")
+        XCTAssertFalse(built.contains { DockIO.isDividerTile($0) })
+    }
+
     func testNativeSpacerAfterAppIsKept() throws {
         let safari = fixtureApp(label: "Safari", bundle: "com.apple.Safari", group: "browsers", inDock: true)
         let slack = fixtureApp(label: "Slack", bundle: "com.tinyspeck.slackmacgap", group: "communication", inDock: true)
