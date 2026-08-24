@@ -75,6 +75,7 @@ final class AppModel: ObservableObject {
                     saturation: sample?.sat ?? 0,
                     value: sample?.val ?? 0,
                     colorful: sample?.colorful ?? false,
+                    luminance: sample?.luminance ?? 0.5,
                     hex: sample?.hex ?? "#888888",
                     groupID: row.groupID,
                     inDock: row.inDock

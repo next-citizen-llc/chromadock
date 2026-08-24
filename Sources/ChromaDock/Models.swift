@@ -10,6 +10,7 @@ struct DockApp: Identifiable, Hashable, Codable, Sendable {
     var saturation: Double
     var value: Double
     var colorful: Bool
+    var luminance: Double
     var hex: String
     var groupID: String
     var inDock: Bool

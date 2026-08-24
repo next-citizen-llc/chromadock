@@ -8,7 +8,7 @@ enum HueSampler {
         let bytes: [UInt8]
     }
 
-    typealias Sample = (hue: Double, sat: Double, val: Double, colorful: Bool, hex: String)
+    typealias Sample = (hue: Double, sat: Double, val: Double, colorful: Bool, hex: String, luminance: Double)
 
     /// AppKit icon loading and `NSImage.draw` must run on the main thread.
     @MainActor
@@ -51,6 +51,7 @@ enum HueSampler {
         var satW = [Double](repeating: 0, count: 36)
         var valW = [Double](repeating: 0, count: 36)
         var grayH = 0.0, grayS = 0.0, grayV = 0.0, grayN = 0.0, colorN = 0.0
+        var lumSum = 0.0, lumN = 0.0
 
         for y in 0..<size {
             for x in 0..<size {
@@ -58,10 +59,12 @@ enum HueSampler {
                 guard o + 3 < bytes.count else { continue }
                 let a = Double(bytes[o + 3]) / 255.0
                 if a < 0.4 { continue }
-                let r = Double(bytes[o]) / 255.0 / max(a, 0.001)
-                let g = Double(bytes[o + 1]) / 255.0 / max(a, 0.001)
-                let b = Double(bytes[o + 2]) / 255.0 / max(a, 0.001)
-                let hsvv = hsv(r: min(1, r), g: min(1, g), b: min(1, b))
+                let r = min(1, Double(bytes[o]) / 255.0 / max(a, 0.001))
+                let g = min(1, Double(bytes[o + 1]) / 255.0 / max(a, 0.001))
+                let b = min(1, Double(bytes[o + 2]) / 255.0 / max(a, 0.001))
+                lumSum += LineStyle.luminance(r: r, g: g, b: b) * a
+                lumN += a
+                let hsvv = hsv(r: r, g: g, b: b)
                 if hsvv.s < 0.12 && hsvv.v > 0.88 { continue }
                 if hsvv.v < 0.08 { continue }
                 let weight = a * (0.35 + hsvv.s)
@@ -79,6 +82,9 @@ enum HueSampler {
                 }
             }
         }
+
+        guard lumN > 0 else { return nil }
+        let luminance = lumSum / lumN
 
         let colorful = colorN > grayN * 0.35 && colorN > 8
         let h: Double, s: Double, v: Double
@@ -102,10 +108,12 @@ enum HueSampler {
             s = grayS / grayN
             v = grayV / grayN
         } else {
-            return nil
+            h = 0
+            s = 0
+            v = luminance
         }
         let hue = h.truncatingRemainder(dividingBy: 1)
-        return (hue, s, v, colorful, hexFromHSV(hue, s, v))
+        return (hue, s, v, colorful, hexFromHSV(hue, s, v), luminance)
     }
 
     @MainActor
@@ -113,17 +121,15 @@ enum HueSampler {
         rasterize(path: path, size: size).flatMap(analyze)
     }
 
-    static func sortKey(_ app: DockApp) -> (Int, Double, Double) {
-        if !app.colorful { return (0, app.value, app.saturation) }
-        return (1, app.hue, -app.saturation)
+    static func sortKey(_ app: DockApp) -> (Double, String) {
+        (app.luminance, app.label.lowercased())
     }
 
     static func hueSorted(_ apps: [DockApp]) -> [DockApp] {
         apps.sorted { a, b in
             let ka = sortKey(a), kb = sortKey(b)
             if ka.0 != kb.0 { return ka.0 < kb.0 }
-            if ka.1 != kb.1 { return ka.1 < kb.1 }
-            return ka.2 < kb.2
+            return ka.1 < kb.1
         }
     }
 

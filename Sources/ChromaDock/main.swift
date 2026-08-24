@@ -4,7 +4,7 @@ import Foundation
 let args = CommandLine.arguments
 if args.contains("--help") || args.contains("-h") {
     fputs("""
-    ChromaDock — group Dock apps and hue-sort each group.
+    ChromaDock — group Dock apps and sort each group dark to light.
 
       (no args)     open the app
       --scan        read Dock icons and print the result
