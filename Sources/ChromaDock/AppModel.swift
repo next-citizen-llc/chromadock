@@ -434,6 +434,8 @@ final class AppModel: ObservableObject {
         }
     }
 
+    static let leadingSpacerAnchor = ""
+
     nonisolated static func buildPersistentApps(
         settings: AppSettings,
         apps: [DockApp],
@@ -445,12 +447,13 @@ final class AppModel: ObservableObject {
         }
         var byBundle: [String: [String: Any]] = [:]
         var spacersAfter: [String: [[String: Any]]] = [:]
+        var spacerOrder: [String] = []
         var lastBundle: String?
         for tile in current {
             if DockIO.isNativeSpacer(tile) {
-                if let lastBundle {
-                    spacersAfter[lastBundle, default: []].append(tile)
-                }
+                let key = lastBundle ?? Self.leadingSpacerAnchor
+                if spacersAfter[key] == nil { spacerOrder.append(key) }
+                spacersAfter[key, default: []].append(tile)
                 continue
             }
             if DockIO.isDividerTile(tile) { continue }
@@ -462,6 +465,11 @@ final class AppModel: ObservableObject {
 
         let dockedBundles = Set(byBundle.keys)
         var newApps: [[String: Any]] = []
+        var flushedSpacers = Set<String>()
+        if let leading = spacersAfter[Self.leadingSpacerAnchor] {
+            newApps.append(contentsOf: leading)
+            flushedSpacers.insert(Self.leadingSpacerAnchor)
+        }
         var dividerIndex = 0
         var first = true
         for group in settings.groups {
@@ -488,6 +496,7 @@ final class AppModel: ObservableObject {
                 }
                 if let spacers = spacersAfter[app.bundleIdentifier] {
                     newApps.append(contentsOf: spacers)
+                    flushedSpacers.insert(app.bundleIdentifier)
                 }
             }
         }
@@ -502,6 +511,12 @@ final class AppModel: ObservableObject {
             newApps.append(tile)
             emitted.insert(bundle)
             if let spacers = spacersAfter[bundle] {
+                newApps.append(contentsOf: spacers)
+                flushedSpacers.insert(bundle)
+            }
+        }
+        for key in spacerOrder where !flushedSpacers.contains(key) {
+            if let spacers = spacersAfter[key] {
                 newApps.append(contentsOf: spacers)
             }
         }
