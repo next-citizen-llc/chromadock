@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import Foundation
 import ServiceManagement
+import SwiftUI
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -110,10 +111,13 @@ final class AppModel: ObservableObject {
         settings.groups.removeAll { $0.id == id }
         for i in apps.indices where apps[i].groupID == id {
             apps[i].groupID = settings.ungroupedID
-            if settings.assignments[apps[i].bundleIdentifier] != nil {
-                settings.assignments[apps[i].bundleIdentifier] = settings.ungroupedID
-            }
         }
+        settings.assignments = Self.rewriteAssignmentsAfterDelete(
+            deletedGroupID: id,
+            ungroupedID: settings.ungroupedID,
+            apps: apps,
+            assignments: settings.assignments
+        )
         saveSettings()
     }
 
@@ -320,12 +324,27 @@ final class AppModel: ObservableObject {
         return appPath
     }
 
+    nonisolated static func rewriteAssignmentsAfterDelete(
+        deletedGroupID: String,
+        ungroupedID: String,
+        apps: [DockApp],
+        assignments: [String: String]
+    ) -> [String: String] {
+        var next = assignments
+        for app in apps where app.groupID == deletedGroupID {
+            if next[app.bundleIdentifier] != nil {
+                next[app.bundleIdentifier] = ungroupedID
+            }
+        }
+        return next
+    }
+
     nonisolated static func willEmitTile(_ app: DockApp, settings: AppSettings, dockedBundles: Set<String>) -> Bool {
         if dockedBundles.contains(app.bundleIdentifier) { return true }
         return settings.assignments[app.bundleIdentifier] != nil && !app.path.isEmpty
     }
 
-    enum DockApplyError: LocalizedError {
+    enum DockApplyError: LocalizedError, Equatable {
         case emptyScan
         case noAppTiles
 
@@ -339,13 +358,15 @@ final class AppModel: ObservableObject {
         }
     }
 
-    nonisolated static func applyArrangement(settings: AppSettings, apps: [DockApp]) throws -> URL {
+    nonisolated static func buildPersistentApps(
+        settings: AppSettings,
+        apps: [DockApp],
+        current: [[String: Any]],
+        helperURLs: [URL]
+    ) throws -> [[String: Any]] {
         guard apps.contains(where: { $0.inDock }) else {
             throw DockApplyError.emptyScan
         }
-        let dict = try DockIO.exportPlist()
-        let backup = try DockIO.writeBackup(dict)
-        let current = DockIO.persistentApps(dict)
         var byBundle: [String: [String: Any]] = [:]
         for tile in current {
             if DockIO.isDividerTile(tile) { continue }
@@ -357,14 +378,6 @@ final class AppModel: ObservableObject {
         let dockedBundles = Set(byBundle.keys)
         var newApps: [[String: Any]] = []
         var dividerIndex = 0
-        var helperURLs: [URL] = []
-        if settings.insertDividers {
-            let gaps = max(0, settings.groups.filter { group in
-                apps.contains { $0.groupID == group.id && willEmitTile($0, settings: settings, dockedBundles: dockedBundles) }
-            }.count - 1)
-            helperURLs = try DividerManager.ensureHelpers(count: max(gaps, 0))
-        }
-
         var first = true
         for group in settings.groups {
             var members = apps.filter { $0.groupID == group.id && willEmitTile($0, settings: settings, dockedBundles: dockedBundles) }
@@ -395,6 +408,27 @@ final class AppModel: ObservableObject {
         guard !realTiles.isEmpty else {
             throw DockApplyError.noAppTiles
         }
+        return newApps
+    }
+
+    nonisolated static func applyArrangement(settings: AppSettings, apps: [DockApp]) throws -> URL {
+        let dict = try DockIO.exportPlist()
+        let backup = try DockIO.writeBackup(dict)
+        let current = DockIO.persistentApps(dict)
+        var helperURLs: [URL] = []
+        if settings.insertDividers {
+            let dockedBundles = Set(current.compactMap { DockIO.isDividerTile($0) ? nil : DockIO.bundleID(of: $0) })
+            let gaps = max(0, settings.groups.filter { group in
+                apps.contains { $0.groupID == group.id && willEmitTile($0, settings: settings, dockedBundles: dockedBundles) }
+            }.count - 1)
+            helperURLs = try DividerManager.ensureHelpers(count: max(gaps, 0))
+        }
+        let newApps = try buildPersistentApps(
+            settings: settings,
+            apps: apps,
+            current: current,
+            helperURLs: helperURLs
+        )
 
         var next = dict
         next["persistent-apps"] = newApps
