@@ -84,8 +84,9 @@ glass plate. The working approach:
 
 - ChromaDock installs small helper apps (`llc.nextcitizen.ChromaDock.line.N`)
   into `~/Library/Application Support/ChromaDock/Lines/`.
-- Each helper bundle uses a mostly-transparent **hairline icon** as its Dock
-  artwork, so the line is the file-tile itself.
+- Each helper bundle uses an **opaque hairline icon** (dark vertical bar on a
+  filled tile). Fully transparent artwork is replaced by Dock glass and the
+  line vanishes.
 - Helpers are `LSUIElement` agents. They do not show a running-app dot, appear
   in ⌘-Tab, or steal the menu bar. **Keep lines drawn** relaunches them after
   Apply; the hairline still shows if a helper is not running.

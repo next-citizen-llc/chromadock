@@ -75,7 +75,7 @@ enum DividerManager {
         try FileManager.default.copyItem(at: executable, to: destExe)
         try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: destExe.path)
 
-        let iconURL = resources.appendingPathComponent("DividerLine.icns")
+        let iconURL = resources.appendingPathComponent("Hairline.icns")
         if let icon {
             try FileManager.default.copyItem(at: icon, to: iconURL)
         } else {
@@ -87,13 +87,13 @@ enum DividerManager {
             "CFBundleDevelopmentRegion": "en",
             "CFBundleDisplayName": "│",
             "CFBundleExecutable": Paths.helperExecutableName,
-            "CFBundleIconFile": "DividerLine",
+            "CFBundleIconFile": "Hairline",
             "CFBundleIdentifier": ident,
             "CFBundleInfoDictionaryVersion": "6.0",
             "CFBundleName": "ChromaDock Divider \(index)",
             "CFBundlePackageType": "APPL",
-            "CFBundleShortVersionString": "1.1",
-            "CFBundleVersion": "2",
+            "CFBundleShortVersionString": "1.2",
+            "CFBundleVersion": "3",
             "LSMinimumSystemVersion": "14.0",
             "LSUIElement": true,
             "NSHighResolutionCapable": true
@@ -129,12 +129,15 @@ enum DividerManager {
         else {
             throw NSError(domain: "ChromaDock", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not draw divider icon."])
         }
-        ctx.clear(CGRect(x: 0, y: 0, width: pixelSize, height: pixelSize))
+        // Fill the tile. Fully transparent artwork is replaced by Dock glass
+        // and the line disappears. A filled plate plus a dark bar stays visible.
+        ctx.setFillColor(CGColor(gray: 0.72, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: pixelSize, height: pixelSize))
         let size = CGFloat(pixelSize)
-        let w = max(1.0, min(1.5, (size * 0.012).rounded()))
+        let w = max(2.0, (size * 0.03).rounded())
         let x = ((size - w) / 2).rounded(.down)
-        let inset = max(2.0, size * 0.10)
-        ctx.setFillColor(CGColor(gray: 1.0, alpha: 0.42))
+        let inset = max(2.0, size * 0.12)
+        ctx.setFillColor(CGColor(gray: 0.08, alpha: 1))
         ctx.fill(CGRect(x: x, y: inset, width: w, height: size - inset * 2))
         guard let image = ctx.makeImage() else {
             throw NSError(domain: "ChromaDock", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not draw divider icon."])

@@ -1,3 +1,5 @@
+import CoreGraphics
+import ImageIO
 import XCTest
 @testable import ChromaDockCore
 
@@ -200,6 +202,34 @@ final class BuildPersistentAppsTests: XCTestCase {
         XCTAssertEqual(DockIO.bundleID(of: built[3]), "com.tinyspeck.slackmacgap")
     }
 
+    func testLegacyAndCurrentDividerTilesAreNotLeftovers() throws {
+        let safari = fixtureApp(label: "Safari", bundle: "com.apple.Safari", group: "browsers", inDock: true)
+        let slack = fixtureApp(label: "Slack", bundle: "com.tinyspeck.slackmacgap", group: "communication", inDock: true)
+        let current = [
+            fileTile(bundle: "com.apple.Safari", label: "Safari"),
+            fileTile(bundle: "llc.nextcitizen.ChromaDock.divider.1", label: "│"),
+            fileTile(bundle: "com.tinyspeck.slackmacgap", label: "Slack"),
+            fileTile(bundle: "llc.nextcitizen.ChromaDock.line.1", label: "│"),
+            fileTile(bundle: "llc.nextcitizen.ChromaDock.line.2", label: "│")
+        ]
+        var settings = AppSettings.default
+        settings.insertDividers = true
+        let helper = URL(fileURLWithPath: "/tmp/Line 1.app")
+        let built = try AppModel.buildPersistentApps(
+            settings: settings,
+            apps: [safari, slack],
+            current: current,
+            helperURLs: [helper]
+        )
+        XCTAssertEqual(built.count, 3)
+        XCTAssertEqual(DockIO.bundleID(of: built[0]), "com.apple.Safari")
+        XCTAssertTrue(DockIO.isDividerTile(built[1]))
+        XCTAssertEqual(DockIO.bundleID(of: built[1]), "llc.nextcitizen.ChromaDock.line.1")
+        XCTAssertEqual(DockIO.bundleID(of: built[2]), "com.tinyspeck.slackmacgap")
+        XCTAssertFalse(built.contains { DockIO.bundleID(of: $0) == "llc.nextcitizen.ChromaDock.divider.1" })
+        XCTAssertFalse(built.contains { DockIO.bundleID(of: $0) == "llc.nextcitizen.ChromaDock.line.2" })
+    }
+
     func testUnscannedDockedAppIsKept() throws {
         let slack = fixtureApp(label: "Slack", bundle: "com.tinyspeck.slackmacgap", group: "communication", inDock: true)
         let current = [
@@ -264,6 +294,15 @@ final class RestoreDividerCountTests: XCTestCase {
 }
 
 final class HelperLaunchIdentityTests: XCTestCase {
+    func testAllDividerPrefixesAndInstallPaths() {
+        XCTAssertTrue(Paths.isDividerBundle("llc.nextcitizen.ChromaDock.line.1"))
+        XCTAssertTrue(Paths.isDividerBundle("llc.nextcitizen.ChromaDock.divider.2"))
+        XCTAssertTrue(Paths.isDividerInstallPath("/Users/me/Library/Application Support/ChromaDock/Lines/Line 1.app"))
+        XCTAssertTrue(Paths.isDividerInstallPath("/Users/me/Library/Application Support/ChromaDock/Dividers/Divider 1.app"))
+        XCTAssertFalse(Paths.isDividerInstallPath("/Applications/Safari.app"))
+        XCTAssertFalse(Paths.isDividerBundle("com.apple.Safari"))
+    }
+
     func testOldAndNewDividerPrefixesAreRecognized() {
         XCTAssertTrue(DockIO.isDividerTile(fileTile(bundle: "llc.nextcitizen.ChromaDock.line.1", label: "│")))
         XCTAssertTrue(DockIO.isDividerTile(fileTile(bundle: "llc.nextcitizen.ChromaDock.divider.2", label: "│")))
@@ -286,10 +325,23 @@ final class HelperLaunchIdentityTests: XCTestCase {
 }
 
 final class DividerIconTests: XCTestCase {
-    func testHairlinePNGIsTransparentPNG() throws {
+    func testHairlinePNGIsOpaquePNG() throws {
         let data = try DividerManager.hairlinePNG(pixelSize: 128)
         XCTAssertGreaterThan(data.count, 32)
         XCTAssertEqual(Array(data.prefix(8)), [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+        let src = CGImageSourceCreateWithData(data as CFData, nil)
+        let image = src.flatMap { CGImageSourceCreateImageAtIndex($0, 0, nil) }
+        XCTAssertNotNil(image)
+        XCTAssertEqual(image?.width, 128)
+        let center = image.flatMap { img -> UInt8? in
+            guard let data = img.dataProvider?.data else { return nil }
+            let ptr = CFDataGetBytePtr(data)
+            let bpr = img.bytesPerRow
+            let off = (64 * bpr) + (64 * 4)
+            return ptr?[off]
+        }
+        XCTAssertNotNil(center)
+        XCTAssertLessThan(center ?? 255, 80)
     }
 
     func testInstallHelperReplacesStaleBrandIconWithHairline() throws {
@@ -309,13 +361,14 @@ final class DividerIconTests: XCTestCase {
         let app = try DividerManager.installHelper(index: 1, executable: exe, into: dir)
         let resources = app.appendingPathComponent("Contents/Resources")
         XCTAssertFalse(fm.fileExists(atPath: resources.appendingPathComponent("AppIcon.icns").path))
-        XCTAssertTrue(fm.fileExists(atPath: resources.appendingPathComponent("DividerLine.icns").path))
+        XCTAssertFalse(fm.fileExists(atPath: resources.appendingPathComponent("DividerLine.icns").path))
+        XCTAssertTrue(fm.fileExists(atPath: resources.appendingPathComponent("Hairline.icns").path))
 
         let infoURL = app.appendingPathComponent("Contents/Info.plist")
         let infoData = try Data(contentsOf: infoURL)
         let obj = try PropertyListSerialization.propertyList(from: infoData, options: [], format: nil)
         let info = try XCTUnwrap(obj as? [String: Any])
-        XCTAssertEqual(info["CFBundleIconFile"] as? String, "DividerLine")
+        XCTAssertEqual(info["CFBundleIconFile"] as? String, "Hairline")
         XCTAssertEqual(info["LSUIElement"] as? Bool, true)
         XCTAssertEqual(info["CFBundleIdentifier"] as? String, "llc.nextcitizen.ChromaDock.line.1")
     }
