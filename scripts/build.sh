@@ -15,7 +15,9 @@ echo "Compiling divider helper…"
 swiftc -O \
   -sdk "$SDK" \
   -target "$TARGET" \
-  -framework AppKit \
+  -framework AppKit -framework ImageIO \
+  "$ROOT/Sources/ChromaDock/LineStyle.swift" \
+  "$ROOT/Sources/ChromaDock/WallpaperSampler.swift" \
   "$ROOT/Sources/DividerHelper/main.swift" \
   -o "$APP/Contents/MacOS/ChromaDockDivider"
 
