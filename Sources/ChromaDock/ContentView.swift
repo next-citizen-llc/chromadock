@@ -81,6 +81,7 @@ struct ContentView: View {
         }
         .onAppear {
             if model.apps.isEmpty { model.refresh() }
+            model.startDividerHelpersIfNeeded()
             if selectedGroup == nil {
                 selectedGroup = model.settings.groups.first?.id
             }
