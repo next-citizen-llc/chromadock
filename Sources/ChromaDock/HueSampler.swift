@@ -1,0 +1,139 @@
+import AppKit
+import Foundation
+
+enum HueSampler {
+    static func sample(path: String, size: Int = 48) -> (hue: Double, sat: Double, val: Double, colorful: Bool, hex: String)? {
+        guard FileManager.default.fileExists(atPath: path) else { return nil }
+        let icon = NSWorkspace.shared.icon(forFile: path)
+        icon.size = NSSize(width: size, height: size)
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: size,
+            pixelsHigh: size,
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0
+        ) else { return nil }
+
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        NSColor.clear.setFill()
+        NSRect(x: 0, y: 0, width: size, height: size).fill()
+        icon.draw(in: NSRect(x: 0, y: 0, width: size, height: size),
+                  from: .zero, operation: .sourceOver, fraction: 1)
+        NSGraphicsContext.restoreGraphicsState()
+        guard let bytes = rep.bitmapData else { return nil }
+        let bpr = max(rep.bytesPerRow, size * 4)
+
+        var hueW = [Double](repeating: 0, count: 36)
+        var satW = [Double](repeating: 0, count: 36)
+        var valW = [Double](repeating: 0, count: 36)
+        var grayH = 0.0, grayS = 0.0, grayV = 0.0, grayN = 0.0, colorN = 0.0
+
+        for y in 0..<size {
+            for x in 0..<size {
+                let o = y * bpr + x * 4
+                let a = Double(bytes[o + 3]) / 255.0
+                if a < 0.4 { continue }
+                let r = Double(bytes[o]) / 255.0 / max(a, 0.001)
+                let g = Double(bytes[o + 1]) / 255.0 / max(a, 0.001)
+                let b = Double(bytes[o + 2]) / 255.0 / max(a, 0.001)
+                let hsvv = hsv(r: min(1, r), g: min(1, g), b: min(1, b))
+                if hsvv.s < 0.12 && hsvv.v > 0.88 { continue }
+                if hsvv.v < 0.08 { continue }
+                let weight = a * (0.35 + hsvv.s)
+                if hsvv.s < 0.18 {
+                    grayH += hsvv.h * weight
+                    grayS += hsvv.s * weight
+                    grayV += hsvv.v * weight
+                    grayN += weight
+                } else {
+                    let bin = min(35, Int((hsvv.h * 36.0).rounded(.down)))
+                    hueW[bin] += weight
+                    satW[bin] += hsvv.s * weight
+                    valW[bin] += hsvv.v * weight
+                    colorN += weight
+                }
+            }
+        }
+
+        let colorful = colorN > grayN * 0.35 && colorN > 8
+        let h: Double, s: Double, v: Double
+        if colorful {
+            var best = 0
+            for i in 1..<36 where hueW[i] > hueW[best] { best = i }
+            var accH = 0.0, accW = 0.0, accS = 0.0, accV = 0.0
+            for d in -2...2 {
+                let i = (best + d + 36) % 36
+                let wgt = hueW[i]
+                accH += Double(i) * wgt
+                accW += wgt
+                accS += satW[i]
+                accV += valW[i]
+            }
+            h = (accW == 0 ? Double(best) : accH / accW) / 36.0
+            s = accW == 0 ? 0 : accS / accW
+            v = accW == 0 ? 0 : accV / accW
+        } else if grayN > 0 {
+            h = grayH / grayN
+            s = grayS / grayN
+            v = grayV / grayN
+        } else {
+            return nil
+        }
+        let hue = h.truncatingRemainder(dividingBy: 1)
+        return (hue, s, v, colorful, hexFromHSV(hue, s, v))
+    }
+
+    static func sortKey(_ app: DockApp) -> (Int, Double, Double) {
+        if !app.colorful { return (0, app.value, app.saturation) }
+        return (1, app.hue, -app.saturation)
+    }
+
+    static func hueSorted(_ apps: [DockApp]) -> [DockApp] {
+        apps.sorted { a, b in
+            let ka = sortKey(a), kb = sortKey(b)
+            if ka.0 != kb.0 { return ka.0 < kb.0 }
+            if ka.1 != kb.1 { return ka.1 < kb.1 }
+            return ka.2 < kb.2
+        }
+    }
+
+    private static func hsv(r: Double, g: Double, b: Double) -> (h: Double, s: Double, v: Double) {
+        let mx = max(r, g, b)
+        let mn = min(r, g, b)
+        let d = mx - mn
+        var h = 0.0
+        if d > 1e-9 {
+            if mx == r { h = (g - b) / d + (g < b ? 6 : 0) }
+            else if mx == g { h = (b - r) / d + 2 }
+            else { h = (r - g) / d + 4 }
+            h /= 6
+        }
+        let s = mx == 0 ? 0 : d / mx
+        return (h, s, mx)
+    }
+
+    private static func hexFromHSV(_ h: Double, _ s: Double, _ v: Double) -> String {
+        let i = Int(h * 6)
+        let f = h * 6 - Double(i)
+        let p = v * (1 - s)
+        let q = v * (1 - f * s)
+        let t = v * (1 - (1 - f) * s)
+        let rgb: (Double, Double, Double)
+        switch i % 6 {
+        case 0: rgb = (v, t, p)
+        case 1: rgb = (q, v, p)
+        case 2: rgb = (p, v, t)
+        case 3: rgb = (p, q, v)
+        case 4: rgb = (t, p, v)
+        default: rgb = (v, p, q)
+        }
+        func ch(_ x: Double) -> Int { min(255, max(0, Int((x * 255).rounded()))) }
+        return String(format: "#%02X%02X%02X", ch(rgb.0), ch(rgb.1), ch(rgb.2))
+    }
+}
