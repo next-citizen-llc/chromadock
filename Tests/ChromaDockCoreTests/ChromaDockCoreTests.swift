@@ -44,6 +44,15 @@ final class HeuristicTests: XCTestCase {
             "communication"
         )
     }
+
+    func testResolvedGroupFallsBackWhenHeuristicGroupWasDeleted() {
+        var settings = AppSettings.default
+        settings.groups.removeAll { $0.id == "media" }
+        XCTAssertEqual(
+            AppModel.resolvedGroup(bundle: "com.spotify.client", label: "Spotify", settings: settings),
+            settings.ungroupedID
+        )
+    }
 }
 
 final class WillEmitTileTests: XCTestCase {
