@@ -325,19 +325,19 @@ final class HelperLaunchIdentityTests: XCTestCase {
 }
 
 final class LineStyleTests: XCTestCase {
-    func testDarkWallpaperGetsLightHairline() {
-        XCTAssertEqual(LineStyle.paint(luminance: 0.12, darkAppearance: true), .light)
-        XCTAssertEqual(LineStyle.paint(luminance: 0.20, darkAppearance: false), .light)
+    func testDarkWallpaperGetsDarkHairline() {
+        XCTAssertEqual(LineStyle.paint(luminance: 0.12, darkAppearance: true), .dark)
+        XCTAssertEqual(LineStyle.paint(luminance: 0.20, darkAppearance: false), .dark)
     }
 
-    func testLightWallpaperGetsDarkHairline() {
-        XCTAssertEqual(LineStyle.paint(luminance: 0.80, darkAppearance: true), .dark)
-        XCTAssertEqual(LineStyle.paint(luminance: 0.70, darkAppearance: false), .dark)
+    func testLightWallpaperGetsLightHairline() {
+        XCTAssertEqual(LineStyle.paint(luminance: 0.80, darkAppearance: true), .light)
+        XCTAssertEqual(LineStyle.paint(luminance: 0.70, darkAppearance: false), .light)
     }
 
     func testNightModeRaisesTheDarknessThreshold() {
-        XCTAssertEqual(LineStyle.paint(luminance: 0.46, darkAppearance: true), .light)
-        XCTAssertEqual(LineStyle.paint(luminance: 0.46, darkAppearance: false), .dark)
+        XCTAssertEqual(LineStyle.paint(luminance: 0.46, darkAppearance: true), .dark)
+        XCTAssertEqual(LineStyle.paint(luminance: 0.46, darkAppearance: false), .light)
     }
 
     func testTileCenterIsScreenCentered() {

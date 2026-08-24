@@ -88,8 +88,8 @@ glass plate. The working approach:
   transparent view that draws only a vertical hairline, so Dock glass shows
   through. macOS then shows a running-app indicator (the black dot) under
   each line — that is the platform cost of custom tile drawing.
-- The hairline color follows the wallpaper behind that tile: a light line on
-  dark regions (including night mode), a dark line on light regions. Helpers
+- The hairline color follows the wallpaper behind that tile: a dark line on
+  dark regions (including night mode), a light line on light regions. Helpers
   restyle on appearance changes, space changes, wake, and once a day.
 - **Keep lines drawn** relaunches those helpers after Apply and at login.
 
