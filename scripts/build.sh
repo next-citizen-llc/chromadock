@@ -28,7 +28,7 @@ echo "Compiling ChromaDock…"
 swiftc -O \
   -sdk "$SDK" \
   -target "$TARGET" \
-  -framework SwiftUI -framework AppKit -framework ServiceManagement -framework ImageIO -framework UniformTypeIdentifiers \
+  -framework SwiftUI -framework AppKit -framework ServiceManagement -framework ImageIO -framework UniformTypeIdentifiers -framework WebKit \
   "$ROOT/Sources/ChromaDock/"*.swift \
   -o "$APP/Contents/MacOS/ChromaDock"
 

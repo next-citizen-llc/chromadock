@@ -502,6 +502,52 @@ final class DockIORunTests: XCTestCase {
     }
 }
 
+final class ContactInterestTests: XCTestCase {
+    func testSubjectAndDefaultBody() {
+        XCTAssertEqual(ContactInterest.subject, "ChromaDock Interest")
+        XCTAssertFalse(ContactInterest.defaultBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
+
+    func testPageURLIsNextczContactWidget() {
+        XCTAssertEqual(ContactInterest.pageURL.host, "nextcz.com")
+        XCTAssertEqual(ContactInterest.pageURL.scheme, "https")
+        XCTAssertEqual(ContactInterest.pageURL.fragment, ContactInterest.widgetID)
+    }
+
+    func testMessagePrependsSubject() {
+        XCTAssertEqual(
+            ContactInterest.message(body: "Please keep me posted."),
+            "ChromaDock Interest\n\nPlease keep me posted."
+        )
+    }
+
+    func testBlankBodyFallsBackToDefault() {
+        XCTAssertEqual(
+            ContactInterest.message(body: "  \n"),
+            "ChromaDock Interest\n\n\(ContactInterest.defaultBody)"
+        )
+    }
+
+    func testMessageDoesNotDuplicateSubject() {
+        let already = "ChromaDock Interest\n\nEdited note."
+        XCTAssertEqual(ContactInterest.message(body: already), already)
+        XCTAssertEqual(ContactInterest.message(body: "ChromaDock Interest"), "ChromaDock Interest")
+    }
+
+    func testPrefillJavaScriptTargetsLiveFormAndEscapes() {
+        let js = ContactInterest.prefillJavaScript(message: "ChromaDock Interest\n\nLine \"quoted\" & <tag>")
+        XCTAssertTrue(js.contains("CONTACT_FORM_MESSAGE"))
+        XCTAssertTrue(js.contains("CONTACT_FORM_EMAIL"))
+        XCTAssertTrue(js.contains("_valueTracker"))
+        XCTAssertTrue(js.contains("setInterval"))
+        XCTAssertFalse(js.contains("if (fill()) return"))
+        XCTAssertTrue(js.contains(ContactInterest.widgetID))
+        XCTAssertTrue(js.contains("\\n"))
+        XCTAssertTrue(js.contains("\\\"quoted\\\""))
+        XCTAssertFalse(js.contains("Line \"quoted\""))
+    }
+}
+
 private func fixtureApp(label: String, bundle: String, group: String, inDock: Bool) -> DockApp {
     DockApp(
         label: label,

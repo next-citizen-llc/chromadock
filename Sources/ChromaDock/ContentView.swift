@@ -205,8 +205,8 @@ struct ContentView: View {
         }
         .toggleStyle(.checkbox)
         .padding(10)
-        .alert("Coming soon in paid version", isPresented: $showPaidComingSoon) {
-            Button("OK", role: .cancel) {}
+        .sheet(isPresented: $showPaidComingSoon) {
+            ContactInterestSheet()
         }
     }
 
