@@ -21,9 +21,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let line = LineView(frame: NSRect(x: 0, y: 0, width: 256, height: 256))
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        bindTile()
-        // Accessory keeps a persistent-apps tile but drops the running-app indicator.
-        NSApp.setActivationPolicy(.accessory)
+        // LSUIElement helpers stay file-tiles. Do not flip through `.regular`:
+        // that enrolls a running-app Dock tile and then `.accessory` discards
+        // the bound contentView, leaving the bundle icon (or a glass plate).
         bindTile()
     }
 
@@ -36,5 +36,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
-app.setActivationPolicy(.regular)
+app.setActivationPolicy(.accessory)
 app.run()

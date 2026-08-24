@@ -182,6 +182,41 @@ final class BuildPersistentAppsTests: XCTestCase {
     }
 }
 
+final class DividerIconTests: XCTestCase {
+    func testHairlinePNGIsTransparentPNG() throws {
+        let data = try DividerManager.hairlinePNG(pixelSize: 128)
+        XCTAssertGreaterThan(data.count, 32)
+        XCTAssertEqual(Array(data.prefix(8)), [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+    }
+
+    func testInstallHelperReplacesStaleBrandIconWithHairline() throws {
+        let fm = FileManager.default
+        let dir = fm.temporaryDirectory.appendingPathComponent("chromadock-helper-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fm.removeItem(at: dir) }
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+
+        let exe = dir.appendingPathComponent("dummy-exe")
+        try Data("#!/bin/sh\nexit 0\n".utf8).write(to: exe)
+        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: exe.path)
+
+        let stale = dir.appendingPathComponent("Divider 1.app/Contents/Resources", isDirectory: true)
+        try fm.createDirectory(at: stale, withIntermediateDirectories: true)
+        try Data("stale".utf8).write(to: stale.appendingPathComponent("AppIcon.icns"))
+
+        let app = try DividerManager.installHelper(index: 1, executable: exe, into: dir)
+        let resources = app.appendingPathComponent("Contents/Resources")
+        XCTAssertFalse(fm.fileExists(atPath: resources.appendingPathComponent("AppIcon.icns").path))
+        XCTAssertTrue(fm.fileExists(atPath: resources.appendingPathComponent("DividerLine.icns").path))
+
+        let infoURL = app.appendingPathComponent("Contents/Info.plist")
+        let infoData = try Data(contentsOf: infoURL)
+        let obj = try PropertyListSerialization.propertyList(from: infoData, options: [], format: nil)
+        let info = try XCTUnwrap(obj as? [String: Any])
+        XCTAssertEqual(info["CFBundleIconFile"] as? String, "DividerLine")
+        XCTAssertEqual(info["LSUIElement"] as? Bool, true)
+    }
+}
+
 final class LegacyDividerCleanupTests: XCTestCase {
     func testLegacyArtifactPaths() {
         let home = URL(fileURLWithPath: "/Users/example", isDirectory: true)

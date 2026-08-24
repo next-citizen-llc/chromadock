@@ -14,6 +14,7 @@ let package = Package(
             exclude: ["main.swift", "App.swift", "ContentView.swift"],
             linkerSettings: [
                 .linkedFramework("AppKit"),
+                .linkedFramework("ImageIO"),
                 .linkedFramework("ServiceManagement"),
                 .linkedFramework("SwiftUI")
             ]
