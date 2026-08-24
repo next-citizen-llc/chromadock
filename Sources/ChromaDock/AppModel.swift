@@ -465,6 +465,7 @@ final class AppModel: ObservableObject {
 
         var next = dict
         next["persistent-apps"] = newApps
+        DividerManager.stopHelpers()
         try DockIO.importPlist(next)
         if settings.insertDividers && settings.keepDividersRunning {
             try await Task.sleep(nanoseconds: 1_600_000_000)
@@ -472,8 +473,6 @@ final class AppModel: ObservableObject {
             await MainActor.run {
                 DividerManager.launchHelpers(helpers)
             }
-        } else {
-            DividerManager.stopHelpers()
         }
         return backup
     }
