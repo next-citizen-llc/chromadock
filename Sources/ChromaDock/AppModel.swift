@@ -242,8 +242,7 @@ final class AppModel: ObservableObject {
             if path.hasPrefix("file://") {
                 path = URL(string: path)?.path ?? path
             }
-            let group = settings.assignments[bundle]
-                ?? Heuristic.suggestedGroup(bundle: bundle, label: label)
+            let group = resolvedGroup(bundle: bundle, label: label, settings: settings)
             rows.append(DockRow(label: label, bundle: bundle, path: path, groupID: group, inDock: true))
         }
         return rows
@@ -260,8 +259,7 @@ final class AppModel: ObservableObject {
             guard !shouldSkipExtra(bundle: bundle, path: url.path) else { continue }
             seen.insert(bundle)
             let label = app.localizedName ?? bundle
-            let group = settings.assignments[bundle]
-                ?? Heuristic.suggestedGroup(bundle: bundle, label: label)
+            let group = resolvedGroup(bundle: bundle, label: label, settings: settings)
             extras.append(DockRow(label: label, bundle: bundle, path: url.path, groupID: group, inDock: false))
         }
         return extras
@@ -275,8 +273,7 @@ final class AppModel: ObservableObject {
             guard !agent.bundle.isEmpty, !seen.contains(agent.bundle) else { continue }
             guard !shouldSkipExtra(bundle: agent.bundle, path: agent.path) else { continue }
             seen.insert(agent.bundle)
-            let group = settings.assignments[agent.bundle]
-                ?? Heuristic.suggestedGroup(bundle: agent.bundle, label: agent.label)
+            let group = resolvedGroup(bundle: agent.bundle, label: agent.label, settings: settings)
             extras.append(DockRow(label: agent.label, bundle: agent.bundle, path: agent.path, groupID: group, inDock: false))
         }
         return extras
@@ -370,6 +367,12 @@ final class AppModel: ObservableObject {
             nextApps[i].groupID = ungroupedID
         }
         return (nextApps, nextAssign)
+    }
+
+    nonisolated static func resolvedGroup(bundle: String, label: String, settings: AppSettings) -> String {
+        let raw = settings.assignments[bundle] ?? Heuristic.suggestedGroup(bundle: bundle, label: label)
+        if settings.groups.contains(where: { $0.id == raw }) { return raw }
+        return settings.ungroupedID
     }
 
     nonisolated static func willEmitTile(_ app: DockApp, settings: AppSettings, dockedBundles: Set<String>) -> Bool {
