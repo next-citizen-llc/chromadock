@@ -15,11 +15,12 @@ enum LineStyle {
         0.2126 * r + 0.7152 * g + 0.0722 * b
     }
 
-    /// Dark wallpaper (or night-mode dark region) gets a dark hairline;
-    /// light regions get a light hairline. The previous mapping was inverted.
+    /// Contrast against the wallpaper behind the tile: a light Dock backdrop
+    /// gets a dark hairline, a dark backdrop gets a light hairline. Night mode
+    /// raises the threshold so more of the strip counts as dark.
     static func paint(luminance: Double, darkAppearance: Bool) -> Paint {
         let threshold = darkAppearance ? 0.50 : 0.42
-        return luminance < threshold ? .dark : .light
+        return luminance < threshold ? .light : .dark
     }
 
     static func tileCenterX(
