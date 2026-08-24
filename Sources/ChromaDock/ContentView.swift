@@ -4,38 +4,29 @@ import SwiftUI
 struct ContentView: View {
     @EnvironmentObject var model: AppModel
     @State private var selectedGroup: String?
+    @State private var renamingGroupID: String?
+    @FocusState private var focusedRenameID: String?
 
     var body: some View {
         NavigationSplitView {
             List(selection: $selectedGroup) {
                 ForEach(model.settings.groups) { group in
-                    let count = model.apps.filter { $0.groupID == group.id }.count
-                    HStack {
-                        Text(group.title)
-                        Spacer()
-                        Text("\(count)")
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
-                    .tag(group.id)
-                    .contextMenu {
-                        if group.id != model.settings.ungroupedID {
-                            Button("Delete Group", role: .destructive) {
-                                model.deleteGroup(group.id)
+                    groupRow(group)
+                        .tag(group.id)
+                        .contextMenu {
+                            Button("Create") { createGroup(after: group.id) }
+                            Button("Rename") { beginRename(group.id) }
+                            if group.id != model.settings.ungroupedID {
+                                Divider()
+                                Button("Delete Group", role: .destructive) {
+                                    deleteGroup(group.id)
+                                }
                             }
                         }
-                    }
                 }
                 .onMove(perform: model.moveGroup)
             }
             .navigationTitle("Groups")
-            .toolbar {
-                ToolbarItem {
-                    Button(action: model.addGroup) {
-                        Label("Add Group", systemImage: "plus")
-                    }
-                }
-            }
         } detail: {
             VStack(alignment: .leading, spacing: 0) {
                 optionsBar
@@ -68,12 +59,16 @@ struct ContentView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            HStack {
+            HStack(spacing: 10) {
+                Button("New Group", action: { createGroup() })
+                    .accessibilityLabel("New Group")
+                    .accessibilityIdentifier("new-group")
+                Spacer(minLength: 12)
+                if model.isBusy { ProgressView().controlSize(.small) }
                 Text(model.status)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
-                Spacer()
-                if model.isBusy { ProgressView().controlSize(.small) }
+                    .multilineTextAlignment(.trailing)
             }
             .padding(10)
             .background(.bar)
@@ -84,7 +79,59 @@ struct ContentView: View {
                 selectedGroup = model.settings.groups.first?.id
             }
         }
+        .onChange(of: selectedGroup) { _, new in
+            if let renamingGroupID, renamingGroupID != new {
+                self.renamingGroupID = nil
+            }
+        }
+        .onChange(of: renamingGroupID) { _, id in
+            focusedRenameID = id
+        }
         .frame(minWidth: 760, minHeight: 480)
+    }
+
+    @ViewBuilder
+    private func groupRow(_ group: DockGroup) -> some View {
+        let count = model.apps.filter { $0.groupID == group.id }.count
+        HStack {
+            if renamingGroupID == group.id {
+                TextField("Group name", text: Binding(
+                    get: { group.title },
+                    set: { model.renameGroup(group.id, title: $0) }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .focused($focusedRenameID, equals: group.id)
+                .onSubmit { renamingGroupID = nil }
+                .onExitCommand { renamingGroupID = nil }
+            } else {
+                Text(group.title)
+            }
+            Spacer()
+            Text("\(count)")
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+    }
+
+    private func createGroup(after id: String? = nil) {
+        let newID = model.addGroup(after: id)
+        selectedGroup = newID
+        renamingGroupID = newID
+    }
+
+    private func beginRename(_ id: String) {
+        selectedGroup = id
+        renamingGroupID = id
+    }
+
+    private func deleteGroup(_ id: String) {
+        if selectedGroup == id {
+            selectedGroup = model.settings.ungroupedID
+        }
+        if renamingGroupID == id {
+            renamingGroupID = nil
+        }
+        model.deleteGroup(id)
     }
 
     private var optionsBar: some View {

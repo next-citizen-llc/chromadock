@@ -73,10 +73,18 @@ final class AppModel: ObservableObject {
         saveSettings()
     }
 
-    func addGroup() {
-        let id = "group-\(UUID().uuidString.prefix(8))"
-        settings.groups.insert(DockGroup(id: id, title: "New Group", sortByHue: true), at: max(0, settings.groups.count - 1))
+    @discardableResult
+    func addGroup(after id: String? = nil) -> String {
+        let newID = "group-\(UUID().uuidString.prefix(8))"
+        let group = DockGroup(id: newID, title: "New Group", sortByHue: true)
+        let ungroupedIndex = settings.groups.firstIndex(where: { $0.id == settings.ungroupedID }) ?? settings.groups.count
+        var index = ungroupedIndex
+        if let id, let clicked = settings.groups.firstIndex(where: { $0.id == id }) {
+            index = min(clicked + 1, ungroupedIndex)
+        }
+        settings.groups.insert(group, at: max(0, index))
         saveSettings()
+        return newID
     }
 
     func renameGroup(_ id: String, title: String) {
