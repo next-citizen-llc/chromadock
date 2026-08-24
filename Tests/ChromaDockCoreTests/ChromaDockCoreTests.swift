@@ -133,6 +133,32 @@ final class BuildPersistentAppsTests: XCTestCase {
         XCTAssertFalse(built.contains { DockIO.isDividerTile($0) })
     }
 
+    func testNativeSpacerAfterAppIsKept() throws {
+        let safari = fixtureApp(label: "Safari", bundle: "com.apple.Safari", group: "browsers", inDock: true)
+        let slack = fixtureApp(label: "Slack", bundle: "com.tinyspeck.slackmacgap", group: "communication", inDock: true)
+        let spacer: [String: Any] = ["GUID": UInt32(2), "tile-type": "small-spacer-tile", "tile-data": [:]]
+        let current = [
+            fileTile(bundle: "com.apple.Safari", label: "Safari"),
+            spacer,
+            fileTile(bundle: "com.tinyspeck.slackmacgap", label: "Slack")
+        ]
+        var settings = AppSettings.default
+        settings.insertDividers = true
+        let built = try AppModel.buildPersistentApps(
+            settings: settings,
+            apps: [safari, slack],
+            current: current,
+            helperURLs: [URL(fileURLWithPath: "/tmp/Divider 1.app")]
+        )
+        XCTAssertFalse(DockIO.isDividerTile(spacer))
+        XCTAssertTrue(DockIO.isNativeSpacer(spacer))
+        XCTAssertEqual(built.count, 4)
+        XCTAssertEqual(DockIO.bundleID(of: built[0]), "com.apple.Safari")
+        XCTAssertTrue(DockIO.isNativeSpacer(built[1]))
+        XCTAssertTrue(DockIO.isDividerTile(built[2]))
+        XCTAssertEqual(DockIO.bundleID(of: built[3]), "com.tinyspeck.slackmacgap")
+    }
+
     func testTwoDockedGroupsGetOneDivider() throws {
         let safari = fixtureApp(label: "Safari", bundle: "com.apple.Safari", group: "browsers", inDock: true)
         let slack = fixtureApp(label: "Slack", bundle: "com.tinyspeck.slackmacgap", group: "communication", inDock: true)
