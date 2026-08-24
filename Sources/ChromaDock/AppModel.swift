@@ -11,6 +11,7 @@ final class AppModel: ObservableObject {
     @Published var status: String = "Scan the Dock to begin."
     @Published var lastBackupURL: URL?
     @Published var isBusy = false
+    private var helperKeepAlive: Task<Void, Never>?
 
     init() {
         self.settings = Self.loadSettings()
@@ -149,9 +150,16 @@ final class AppModel: ObservableObject {
         defer { isBusy = false }
         let snapshot = (settings: settings, apps: apps)
         do {
-            let backup = try await Self.applyArrangement(settings: snapshot.settings, apps: snapshot.apps)
-            lastBackupURL = backup
-            status = "Dock updated. Backup saved."
+            let outcome = try await Self.applyArrangement(settings: snapshot.settings, apps: snapshot.apps)
+            lastBackupURL = outcome.backup
+            if outcome.helpersExpected > 0, outcome.helpersRunning < outcome.helpersExpected {
+                status = "Dock updated. \(outcome.helpersRunning) of \(outcome.helpersExpected) divider lines running."
+            } else {
+                status = "Dock updated. Backup saved."
+            }
+            if snapshot.settings.insertDividers, snapshot.settings.keepDividersRunning {
+                startDividerHelpersIfNeeded()
+            }
             await refreshAsync()
             return true
         } catch {
@@ -206,16 +214,24 @@ final class AppModel: ObservableObject {
     }
 
     func startDividerHelpersIfNeeded() {
+        helperKeepAlive?.cancel()
         guard settings.insertDividers, settings.keepDividersRunning else { return }
-        guard let items = try? FileManager.default.contentsOfDirectory(
-            at: Paths.dividersDir,
-            includingPropertiesForKeys: nil
-        ) else { return }
-        let urls = items
-            .filter { $0.pathExtension == "app" }
-            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
-        guard !urls.isEmpty else { return }
-        DividerManager.launchHelpers(urls)
+        helperKeepAlive = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                guard self != nil else { break }
+                let urls = DividerManager.installedHelperURLs()
+                if !urls.isEmpty {
+                    _ = await DividerManager.launchHelpers(urls)
+                }
+                try? await Task.sleep(nanoseconds: 15_000_000_000)
+            }
+        }
+    }
+
+    func stopDividerKeepAlive() {
+        helperKeepAlive?.cancel()
+        helperKeepAlive = nil
+        DividerManager.stopHelpers()
     }
 
     func saveSettings() {
@@ -472,7 +488,13 @@ final class AppModel: ObservableObject {
         return newApps
     }
 
-    nonisolated static func applyArrangement(settings: AppSettings, apps: [DockApp]) async throws -> URL {
+    struct DockApplyOutcome {
+        let backup: URL
+        let helpersExpected: Int
+        let helpersRunning: Int
+    }
+
+    nonisolated static func applyArrangement(settings: AppSettings, apps: [DockApp]) async throws -> DockApplyOutcome {
         let dict = try DockIO.exportPlist()
         let backup = try DockIO.writeBackup(dict)
         let current = DockIO.persistentApps(dict)
@@ -495,13 +517,13 @@ final class AppModel: ObservableObject {
         next["persistent-apps"] = newApps
         DividerManager.stopHelpers()
         try DockIO.importPlist(next)
-        if settings.insertDividers && settings.keepDividersRunning {
+        var running = 0
+        if settings.insertDividers && settings.keepDividersRunning && !helperURLs.isEmpty {
             try await Task.sleep(nanoseconds: 1_600_000_000)
             let helpers = helperURLs
-            await MainActor.run {
-                DividerManager.launchHelpers(helpers)
-            }
+            running = await DividerManager.launchHelpers(helpers)
         }
-        return backup
+        let expected = (settings.insertDividers && settings.keepDividersRunning) ? helperURLs.count : 0
+        return DockApplyOutcome(backup: backup, helpersExpected: expected, helpersRunning: running)
     }
 }
