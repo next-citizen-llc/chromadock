@@ -110,7 +110,9 @@ final class AppModel: ObservableObject {
         settings.groups.removeAll { $0.id == id }
         for i in apps.indices where apps[i].groupID == id {
             apps[i].groupID = settings.ungroupedID
-            settings.assignments[apps[i].bundleIdentifier] = settings.ungroupedID
+            if settings.assignments[apps[i].bundleIdentifier] != nil {
+                settings.assignments[apps[i].bundleIdentifier] = settings.ungroupedID
+            }
         }
         saveSettings()
     }
