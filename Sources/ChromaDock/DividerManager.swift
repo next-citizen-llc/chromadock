@@ -153,7 +153,7 @@ enum DividerManager {
             throw NSError(domain: "ChromaDock", code: 3, userInfo: [NSLocalizedDescriptionKey: "Could not draw divider icon."])
         }
         ctx.clear(CGRect(x: 0, y: 0, width: pixelSize, height: pixelSize))
-        let resolved = style == .dots ? LineStyle.Paint(white: 0.0, alpha: 1.0) : paint
+        let resolved = paint
         DividerMark.draw(
             ctx: ctx,
             bounds: CGRect(x: 0, y: 0, width: pixelSize, height: pixelSize),

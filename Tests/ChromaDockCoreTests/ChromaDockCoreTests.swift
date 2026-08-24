@@ -334,17 +334,25 @@ final class DividerStyleTests: XCTestCase {
         XCTAssertEqual(decoded.dividerStyle, .line)
     }
 
-    func testDotsLayoutIsCenterLargeWithSmallerSides() {
-        let layout = DividerMark.circleLayout(in: CGRect(x: 0, y: 0, width: 100, height: 100))
-        XCTAssertGreaterThan(layout.main.width, layout.left.width)
-        XCTAssertEqual(layout.left.width, layout.right.width, accuracy: 0.01)
-        XCTAssertLessThan(layout.left.midX, layout.main.midX)
-        XCTAssertGreaterThan(layout.right.midX, layout.main.midX)
-        XCTAssertEqual(layout.left.midY, layout.main.midY, accuracy: 0.01)
+    func testStoredDotsDecodesAsDash() throws {
+        XCTAssertEqual(DividerStyle.fromStored("dots"), .dash)
+        XCTAssertEqual(DividerStyle.fromStored("dash"), .dash)
+        XCTAssertEqual(DividerStyle.fromStored("line"), .line)
+        XCTAssertEqual(DividerStyle.catalog, [.line, .dash])
     }
 
-    func testDotsPNGIsNotEmpty() throws {
-        let data = try DividerManager.markPNG(pixelSize: 128, style: .dots)
+    func testDashHasFewerThanFiveSegments() {
+        let rects = DividerMark.dashRects(in: CGRect(x: 0, y: 0, width: 100, height: 100))
+        XCTAssertEqual(rects.count, DividerStyle.dashCount)
+        XCTAssertLessThan(rects.count, 5)
+        XCTAssertEqual(rects.count, 4)
+        for i in 1..<rects.count {
+            XCTAssertGreaterThan(rects[i].minY, rects[i - 1].maxY)
+        }
+    }
+
+    func testDashPNGIsNotEmpty() throws {
+        let data = try DividerManager.markPNG(pixelSize: 128, style: .dash)
         XCTAssertGreaterThan(data.count, 32)
         XCTAssertEqual(Array(data.prefix(8)), [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
     }

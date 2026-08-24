@@ -68,7 +68,7 @@ struct AppSettings: Codable, Sendable {
         keepDividersRunning = try c.decode(Bool.self, forKey: .keepDividersRunning)
         openAtLogin = try c.decode(Bool.self, forKey: .openAtLogin)
         ungroupedID = try c.decode(String.self, forKey: .ungroupedID)
-        dividerStyle = try c.decodeIfPresent(DividerStyle.self, forKey: .dividerStyle) ?? .line
+        dividerStyle = DividerStyle.fromStored(try c.decodeIfPresent(String.self, forKey: .dividerStyle))
     }
 
     static var `default`: AppSettings {
