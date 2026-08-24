@@ -321,7 +321,7 @@ final class AppModel: ObservableObject {
 
     nonisolated private static func shouldSkipExtra(bundle: String, path: String) -> Bool {
         if bundle == "com.apple.finder" || bundle == "com.apple.dock" { return true }
-        if bundle.hasPrefix(Paths.dividerBundlePrefix) || bundle.hasPrefix("com.nextcz.dockdivider.") { return true }
+        if Paths.isDividerBundle(bundle) || Paths.isDividerInstallPath(path) { return true }
         if path.contains("/Contents/Frameworks/") { return true }
         return false
     }

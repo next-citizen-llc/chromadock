@@ -12,6 +12,13 @@ enum Paths {
     static var allDividerBundlePrefixes: [String] {
         [dividerBundlePrefix] + legacyDividerBundlePrefixes
     }
+    static func isDividerBundle(_ bundle: String) -> Bool {
+        allDividerBundlePrefixes.contains { bundle.hasPrefix($0) }
+    }
+    static func isDividerInstallPath(_ path: String) -> Bool {
+        path.contains("/Application Support/ChromaDock/Lines/")
+            || path.contains("/Application Support/ChromaDock/Dividers/")
+    }
     static let helperExecutableName = "ChromaDockDivider"
 
     static var appSupport: URL {
