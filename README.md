@@ -20,9 +20,9 @@ organization-owned by [Next Citizen LLC](https://github.com/next-citizen-llc) fo
    Media, Other — rename, reorder, or add your own).
 3. **Apply** backs up the current Dock, keeps any icons you moved across
    sections since Scan, then writes groups together sorted dark → light
-   (darkest on the left) with a transparent bar between groups. The window
-   can preview a slight neighbor-hue blend; **Dock app icons are not
-   recolored.**
+   (darkest on the left) with a transparent bar between groups. **Hue nudge
+   preview** (optional) shows a slight neighbor-hue blend in the window;
+   **Dock app icons are not recolored.**
 4. **Restore** puts back the last backup taken immediately before Apply.
 
 Finder stays on the left. Trash stays on the right. Those two are owned by

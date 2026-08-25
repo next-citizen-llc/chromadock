@@ -245,6 +245,15 @@ final class DockSnapshotTests: XCTestCase {
         let decoded = try JSONDecoder().decode(AppSettings.self, from: data)
         XCTAssertEqual(decoded.dockSnapshot, [:])
     }
+
+    func testMissingHueNudgePreviewDecodesOn() throws {
+        let encoded = try JSONEncoder().encode(AppSettings.default)
+        var obj = try XCTUnwrap(try JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        obj.removeValue(forKey: "previewHueNudge")
+        let data = try JSONSerialization.data(withJSONObject: obj)
+        let decoded = try JSONDecoder().decode(AppSettings.self, from: data)
+        XCTAssertTrue(decoded.previewHueNudge)
+    }
 }
 
 final class HeuristicTests: XCTestCase {

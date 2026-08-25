@@ -36,11 +36,13 @@ struct AppSettings: Codable, Sendable {
     /// Group each docked app sat in at the last Scan, keyed by bundle id.
     /// Used so Apply can tell a live Dock drag from an in-app group pick.
     var dockSnapshot: [String: String]
+    /// In-app neighbor hue preview. Does not recolor Dock tiles.
+    var previewHueNudge: Bool
 
     static let ungroupedID = "other"
 
     enum CodingKeys: String, CodingKey {
-        case groups, assignments, sortByHue, insertDividers, keepDividersRunning, openAtLogin, ungroupedID, dividerStyle, dockSnapshot
+        case groups, assignments, sortByHue, insertDividers, keepDividersRunning, openAtLogin, ungroupedID, dividerStyle, dockSnapshot, previewHueNudge
     }
 
     init(
@@ -52,7 +54,8 @@ struct AppSettings: Codable, Sendable {
         openAtLogin: Bool,
         ungroupedID: String,
         dividerStyle: DividerStyle = .line,
-        dockSnapshot: [String: String] = [:]
+        dockSnapshot: [String: String] = [:],
+        previewHueNudge: Bool = true
     ) {
         self.groups = groups
         self.assignments = assignments
@@ -63,6 +66,7 @@ struct AppSettings: Codable, Sendable {
         self.ungroupedID = ungroupedID
         self.dividerStyle = dividerStyle
         self.dockSnapshot = dockSnapshot
+        self.previewHueNudge = previewHueNudge
     }
 
     init(from decoder: Decoder) throws {
@@ -76,6 +80,7 @@ struct AppSettings: Codable, Sendable {
         ungroupedID = try c.decode(String.self, forKey: .ungroupedID)
         dividerStyle = DividerStyle.fromStored(try c.decodeIfPresent(String.self, forKey: .dividerStyle))
         dockSnapshot = try c.decodeIfPresent([String: String].self, forKey: .dockSnapshot) ?? [:]
+        previewHueNudge = try c.decodeIfPresent(Bool.self, forKey: .previewHueNudge) ?? true
     }
 
     static var `default`: AppSettings {
