@@ -43,7 +43,7 @@ struct ContentView: View {
                         if appQueryTrimmed.isEmpty, let id = selectedGroup,
                            let group = model.settings.groups.first(where: { $0.id == id }) {
                             groupNameBar(group)
-                            if !displayedApps.isEmpty {
+                            if model.settings.previewHueNudge, !displayedApps.isEmpty {
                                 chromaticPreview(displayedApps)
                             }
                         }
@@ -189,6 +189,9 @@ struct ContentView: View {
         HStack(spacing: 16) {
             Toggle("Sort each group dark to light", isOn: $model.settings.sortByHue)
                 .onChange(of: model.settings.sortByHue) { _, _ in model.saveSettings() }
+            Toggle("Hue nudge preview", isOn: $model.settings.previewHueNudge)
+                .onChange(of: model.settings.previewHueNudge) { _, _ in model.saveSettings() }
+                .help("Slight in-app hue blend toward neighboring icons. Dock tiles are not recolored.")
             Toggle("Dividers", isOn: $model.settings.insertDividers)
                 .onChange(of: model.settings.insertDividers) { _, _ in model.saveSettings() }
             separatorsPicker
@@ -297,7 +300,11 @@ struct ContentView: View {
     }
 
     private var displayedNudges: [HueSampler.HueNudge] {
-        HueSampler.neighborAligned(displayedApps)
+        model.settings.previewHueNudge
+            ? HueSampler.neighborAligned(displayedApps)
+            : displayedApps.map {
+                HueSampler.HueNudge(shiftedHue: $0.hue, deltaTurns: 0, hex: $0.hex, applied: false)
+            }
     }
 
     private var appList: some View {
