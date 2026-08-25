@@ -1,4 +1,6 @@
 import AppKit
+import CoreImage
+import CoreImage.CIFilterBuiltins
 import SwiftUI
 
 struct ContentView: View {
@@ -41,6 +43,9 @@ struct ContentView: View {
                         if appQueryTrimmed.isEmpty, let id = selectedGroup,
                            let group = model.settings.groups.first(where: { $0.id == id }) {
                             groupNameBar(group)
+                            if !displayedApps.isEmpty {
+                                chromaticPreview(displayedApps)
+                            }
                         }
                         Divider()
                     }
@@ -291,10 +296,14 @@ struct ContentView: View {
         return model.grouped.first(where: { $0.0.id == id })?.1 ?? []
     }
 
+    private var displayedNudges: [HueSampler.HueNudge] {
+        HueSampler.neighborAligned(displayedApps)
+    }
+
     private var appList: some View {
         List {
-            ForEach(displayedApps) { app in
-                appRow(app, showGroup: !appQueryTrimmed.isEmpty)
+            ForEach(Array(displayedApps.enumerated()), id: \.element.id) { index, app in
+                appRow(app, nudge: displayedNudges[index], showGroup: !appQueryTrimmed.isEmpty)
             }
         }
         .listStyle(.inset)
@@ -328,23 +337,56 @@ struct ContentView: View {
         .padding(.vertical, 8)
     }
 
+    private func chromaticPreview(_ apps: [DockApp]) -> some View {
+        let nudges = HueSampler.neighborAligned(apps)
+        return VStack(alignment: .leading, spacing: 4) {
+            Text("Chromatic preview · Dock icons unchanged")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(Array(apps.enumerated()), id: \.element.id) { index, app in
+                        AppIconView(path: app.path, hueShiftTurns: nudges[index].deltaTurns)
+                            .frame(width: 32, height: 32)
+                            .accessibilityLabel(app.label)
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.bottom, 8)
+    }
+
     @ViewBuilder
-    private func appRow(_ app: DockApp, showGroup: Bool) -> some View {
+    private func appRow(_ app: DockApp, nudge: HueSampler.HueNudge, showGroup: Bool) -> some View {
         let groupTitle = model.settings.groups.first(where: { $0.id == app.groupID })?.title
         HStack(spacing: 10) {
-            AppIconView(path: app.path)
+            AppIconView(path: app.path, hueShiftTurns: nudge.deltaTurns)
                 .frame(width: 28, height: 28)
-            RoundedRectangle(cornerRadius: 3)
-                .fill(Color(hex: app.hex))
-                .frame(width: 14, height: 14)
-                .overlay(RoundedRectangle(cornerRadius: 3).stroke(.secondary.opacity(0.4), lineWidth: 0.5))
+            HStack(spacing: 3) {
+                swatch(app.hex)
+                if nudge.applied {
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(.secondary)
+                    swatch(nudge.hex)
+                }
+            }
             VStack(alignment: .leading, spacing: 1) {
                 Text(app.label)
                 HStack(spacing: 6) {
                     if showGroup, let groupTitle {
                         Text(groupTitle)
                     }
-                    Text(app.colorful ? String(format: "hue %.0f°", app.hueDegrees) : "gray")
+                    if app.colorful {
+                        if nudge.applied {
+                            Text(String(format: "hue %.0f° → %.0f°", app.hueDegrees, nudge.shiftedDegrees))
+                        } else {
+                            Text(String(format: "hue %.0f°", app.hueDegrees))
+                        }
+                    } else {
+                        Text("gray")
+                    }
                     if !app.inDock {
                         Text("not in Dock")
                     }
@@ -365,15 +407,41 @@ struct ContentView: View {
             .frame(width: 180)
         }
     }
+
+    private func swatch(_ hex: String) -> some View {
+        RoundedRectangle(cornerRadius: 3)
+            .fill(Color(hex: hex))
+            .frame(width: 14, height: 14)
+            .overlay(RoundedRectangle(cornerRadius: 3).stroke(.secondary.opacity(0.4), lineWidth: 0.5))
+    }
 }
 
 struct AppIconView: View {
     let path: String
+    var hueShiftTurns: Double = 0
+
     var body: some View {
-        Image(nsImage: NSWorkspace.shared.icon(forFile: path))
+        Image(nsImage: Self.icon(path: path, hueShiftTurns: hueShiftTurns))
             .resizable()
             .interpolation(.high)
             .aspectRatio(contentMode: .fit)
+    }
+
+    private static let context = CIContext(options: [.useSoftwareRenderer: false])
+
+    private static func icon(path: String, hueShiftTurns: Double) -> NSImage {
+        let base = NSWorkspace.shared.icon(forFile: path)
+        guard abs(hueShiftTurns) > 1e-6,
+              let tiff = base.tiffRepresentation,
+              let input = CIImage(data: tiff) else { return base }
+        let filter = CIFilter.hueAdjust()
+        filter.inputImage = input
+        filter.angle = Float(hueShiftTurns * 2 * Double.pi)
+        guard let output = filter.outputImage,
+              let cg = context.createCGImage(output, from: output.extent) else { return base }
+        let shifted = NSImage(cgImage: cg, size: base.size)
+        shifted.isTemplate = false
+        return shifted
     }
 }
 
