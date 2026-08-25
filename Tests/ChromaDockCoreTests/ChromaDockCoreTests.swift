@@ -25,6 +25,78 @@ final class AppNameFilterTests: XCTestCase {
     }
 }
 
+final class NeighborHueTests: XCTestCase {
+    func testGrayDoesNotShiftAndDoesNotPull() {
+        var gray = fixtureApp(label: "Notes", bundle: "notes", group: "system", inDock: true)
+        gray.colorful = false
+        gray.hue = 0.1
+        var red = fixtureApp(label: "Red", bundle: "r", group: "system", inDock: true)
+        red.colorful = true
+        red.hue = 0.0
+        red.saturation = 0.8
+        red.value = 0.8
+        let nudges = HueSampler.neighborAligned([gray, red])
+        XCTAssertFalse(nudges[0].applied)
+        XCTAssertFalse(nudges[1].applied)
+    }
+
+    func testMiddleShiftsTowardNeighborMeanAndStaysCapped() {
+        var left = fixtureApp(label: "Left", bundle: "l", group: "browsers", inDock: true)
+        left.colorful = true
+        left.hue = 0.0
+        left.saturation = 0.9
+        left.value = 0.9
+        var mid = fixtureApp(label: "Mid", bundle: "m", group: "browsers", inDock: true)
+        mid.colorful = true
+        mid.hue = 0.40
+        mid.saturation = 0.9
+        mid.value = 0.9
+        var right = fixtureApp(label: "Right", bundle: "r", group: "browsers", inDock: true)
+        right.colorful = true
+        right.hue = 0.20
+        right.saturation = 0.9
+        right.value = 0.9
+        let nudges = HueSampler.neighborAligned([left, mid, right], maxShiftTurns: 12.0 / 360.0)
+        XCTAssertTrue(nudges[1].applied)
+        XCTAssertEqual(abs(nudges[1].deltaDegrees), 12, accuracy: 0.01)
+        XCTAssertLessThan(nudges[1].shiftedHue, mid.hue)
+    }
+
+    func testHueWrapsAcrossRed() {
+        XCTAssertEqual(HueSampler.shortestHueDelta(from: 0.95, to: 0.05), 0.10, accuracy: 1e-9)
+        XCTAssertEqual(HueSampler.shortestHueDelta(from: 0.05, to: 0.95), -0.10, accuracy: 1e-9)
+        var a = fixtureApp(label: "A", bundle: "a", group: "other", inDock: true)
+        a.colorful = true
+        a.hue = 0.98
+        a.saturation = 0.8
+        a.value = 0.8
+        var b = fixtureApp(label: "B", bundle: "b", group: "other", inDock: true)
+        b.colorful = true
+        b.hue = 0.02
+        b.saturation = 0.8
+        b.value = 0.8
+        let nudges = HueSampler.neighborAligned([a, b], maxShiftTurns: 12.0 / 360.0)
+        XCTAssertGreaterThan(nudges[0].deltaTurns, 0)
+        XCTAssertLessThan(nudges[1].deltaTurns, 0)
+    }
+
+    func testOrderUnchanged() {
+        var a = fixtureApp(label: "Edge", bundle: "edge", group: "browsers", inDock: true)
+        a.colorful = true
+        a.hue = 0.6
+        a.saturation = 0.7
+        a.value = 0.7
+        var b = fixtureApp(label: "Safari", bundle: "safari", group: "browsers", inDock: true)
+        b.colorful = true
+        b.hue = 0.55
+        b.saturation = 0.7
+        b.value = 0.7
+        let apps = [a, b]
+        _ = HueSampler.neighborAligned(apps)
+        XCTAssertEqual(apps.map(\.label), ["Edge", "Safari"])
+    }
+}
+
 final class HueSortTests: XCTestCase {
     func testDarkestIconsComeFirst() {
         var light = fixtureApp(label: "Calendar", bundle: "c", group: "system", inDock: true)

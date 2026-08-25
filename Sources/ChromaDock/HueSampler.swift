@@ -133,6 +133,69 @@ enum HueSampler {
         }
     }
 
+    /// Max neighbor pull, in turns (12°). Live Dock tiles are not recolored.
+    static let defaultMaxShiftTurns = 12.0 / 360.0
+
+    struct HueNudge: Equatable, Sendable {
+        var shiftedHue: Double
+        var deltaTurns: Double
+        var hex: String
+        var applied: Bool
+        var deltaDegrees: Double { deltaTurns * 360 }
+        var shiftedDegrees: Double { shiftedHue * 360 }
+    }
+
+    static func wrapHue(_ h: Double) -> Double {
+        var x = h.truncatingRemainder(dividingBy: 1)
+        if x < 0 { x += 1 }
+        return x
+    }
+
+    static func shortestHueDelta(from: Double, to: Double) -> Double {
+        var d = wrapHue(to) - wrapHue(from)
+        if d > 0.5 { d -= 1 }
+        if d < -0.5 { d += 1 }
+        return d
+    }
+
+    static func circularMeanHue(_ hues: [Double]) -> Double? {
+        guard !hues.isEmpty else { return nil }
+        let x = hues.reduce(0.0) { $0 + cos($1 * 2 * Double.pi) }
+        let y = hues.reduce(0.0) { $0 + sin($1 * 2 * Double.pi) }
+        if abs(x) < 1e-12, abs(y) < 1e-12 { return nil }
+        var a = atan2(y, x) / (2 * Double.pi)
+        if a < 0 { a += 1 }
+        return a
+    }
+
+    /// Slight hue nudge toward immediate colorful neighbors. Gray icons stay
+    /// put and do not pull. Order is unchanged. Does not rewrite Dock tiles.
+    static func neighborAligned(
+        _ apps: [DockApp],
+        maxShiftTurns: Double = defaultMaxShiftTurns
+    ) -> [HueNudge] {
+        let cap = abs(maxShiftTurns)
+        return apps.enumerated().map { i, app in
+            guard app.colorful else {
+                return HueNudge(shiftedHue: app.hue, deltaTurns: 0, hex: app.hex, applied: false)
+            }
+            var neighborHues: [Double] = []
+            if i > 0, apps[i - 1].colorful { neighborHues.append(apps[i - 1].hue) }
+            if i + 1 < apps.count, apps[i + 1].colorful { neighborHues.append(apps[i + 1].hue) }
+            guard let target = circularMeanHue(neighborHues) else {
+                return HueNudge(shiftedHue: app.hue, deltaTurns: 0, hex: app.hex, applied: false)
+            }
+            let delta = min(cap, max(-cap, shortestHueDelta(from: app.hue, to: target)))
+            let shifted = wrapHue(app.hue + delta)
+            return HueNudge(
+                shiftedHue: shifted,
+                deltaTurns: delta,
+                hex: hexFromHSV(shifted, app.saturation, app.value),
+                applied: abs(delta) > 1e-9
+            )
+        }
+    }
+
     private static func hsv(r: Double, g: Double, b: Double) -> (h: Double, s: Double, v: Double) {
         let mx = max(r, g, b)
         let mn = min(r, g, b)
