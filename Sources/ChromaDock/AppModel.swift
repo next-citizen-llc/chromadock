@@ -19,6 +19,10 @@ final class AppModel: ObservableObject {
         if let latest = try? Data(contentsOf: Paths.latestBackup), !latest.isEmpty {
             lastBackupURL = Paths.latestBackup
         }
+        Task { @MainActor in
+            self.startDividerHelpersIfNeeded()
+            self.ensureLoginAgent()
+        }
     }
 
     var grouped: [(DockGroup, [DockApp])] {
@@ -228,21 +232,36 @@ final class AppModel: ObservableObject {
     }
 
     func toggleLoginItem(_ on: Bool) {
-        if #available(macOS 13.0, *) {
-            do {
-                if on {
-                    try SMAppService.mainApp.register()
-                    status = "ChromaDock will open at login and keep divider lines drawn."
-                } else {
-                    try SMAppService.mainApp.unregister()
-                    status = "Login item removed."
-                }
-            } catch {
-                status = error.localizedDescription
-            }
+        if on {
+            ensureLoginAgent()
+            status = "ChromaDock stays in the menu bar at login so it can be restarted."
         } else {
-            status = "Open at login requires macOS 13 or later."
+            DividerManager.unloadAppLaunchAgent()
+            if #available(macOS 13.0, *) {
+                try? SMAppService.mainApp.unregister()
+            }
+            status = "Login item removed."
         }
+    }
+
+    func ensureLoginAgent() {
+        guard settings.openAtLogin else { return }
+        let url = Bundle.main.bundleURL
+        guard url.path.hasSuffix("ChromaDock.app") else { return }
+        DividerManager.installAppLaunchAgent(appURL: url)
+        if #available(macOS 13.0, *) {
+            try? SMAppService.mainApp.unregister()
+        }
+    }
+
+    func restartDividerHelpers() {
+        _ = try? DockIO.run("/usr/bin/pkill", ["-x", Paths.helperExecutableName])
+        startDividerHelpersIfNeeded()
+        status = "Restarted divider lines."
+    }
+
+    func restartApp() {
+        NSApp.terminate(nil)
     }
 
     func startDividerHelpersIfNeeded() {

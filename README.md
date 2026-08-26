@@ -103,8 +103,11 @@ glass plate. The working approach:
   link to the [nextcz.com](https://nextcz.com/) contact form. The form is the
   same GoDaddy widget as the website; only email still has to be typed.
 
-Open at login (optional) relaunches ChromaDock so it can start those helpers
-again after a reboot.
+The controller itself is a menu bar extra labeled **CD**. It does not take a
+Dock tile. Open the Groups window, restart the divider lines, or restart
+ChromaDock from that extra. **Open at login** installs a KeepAlive LaunchAgent
+so the extra returns after a reboot or a Restart. Divider helpers stay ordinary
+Dock apps; that is how the hairline is drawn.
 
 ---
 

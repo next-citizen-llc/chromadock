@@ -671,6 +671,19 @@ final class DividerIconTests: XCTestCase {
         XCTAssertNil(info["LSUIElement"])
         XCTAssertEqual(info["CFBundleIdentifier"] as? String, "llc.nextcitizen.ChromaDock.line.1")
     }
+
+    func testMainAppInfoPlistHidesDockIcon() throws {
+        let plist = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("Resources/Info.plist")
+        let data = try Data(contentsOf: plist)
+        let obj = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)
+        let info = try XCTUnwrap(obj as? [String: Any])
+        XCTAssertEqual(info["LSUIElement"] as? Bool, true)
+        XCTAssertEqual(info["CFBundleIdentifier"] as? String, "llc.nextcitizen.ChromaDock")
+    }
 }
 
 final class WallpaperPathTests: XCTestCase {
@@ -684,9 +697,14 @@ final class LegacyDividerCleanupTests: XCTestCase {
     func testLegacyArtifactPaths() {
         let home = URL(fileURLWithPath: "/Users/example", isDirectory: true)
         XCTAssertEqual(DividerManager.linesLaunchAgentLabel, "llc.nextcitizen.ChromaDock.lines")
+        XCTAssertEqual(DividerManager.appLaunchAgentLabel, "llc.nextcitizen.ChromaDock")
         XCTAssertEqual(
             DividerManager.linesLaunchAgentPlist(home: home).path,
             "/Users/example/Library/LaunchAgents/llc.nextcitizen.ChromaDock.lines.plist"
+        )
+        XCTAssertEqual(
+            DividerManager.appLaunchAgentPlist(home: home).path,
+            "/Users/example/Library/LaunchAgents/llc.nextcitizen.ChromaDock.plist"
         )
         XCTAssertEqual(
             DividerManager.linesKeepScript(home: home).path,
