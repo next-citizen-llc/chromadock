@@ -457,9 +457,13 @@ struct MenuBarView: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Button("Open ChromaDock…") { openWindow(id: "main") }
+        Button("Open ChromaDock…") {
+            openWindow(id: "main")
+            NSApp.activate(ignoringOtherApps: true)
+        }
             .onReceive(NotificationCenter.default.publisher(for: .chromaDockReopen)) { _ in
                 openWindow(id: "main")
+                NSApp.activate(ignoringOtherApps: true)
             }
         Button("Scan Dock") { model.refresh() }
             .disabled(model.isBusy)
@@ -468,7 +472,9 @@ struct MenuBarView: View {
         Button("Restore last backup") { model.restore() }
             .disabled(model.lastBackupURL == nil || model.isBusy)
         Divider()
-        Button("Quit ChromaDock") { NSApp.terminate(nil) }
+        Button("Restart divider lines") { model.restartDividerHelpers() }
+            .disabled(model.isBusy)
+        Button("Restart ChromaDock") { model.restartApp() }
     }
 }
 

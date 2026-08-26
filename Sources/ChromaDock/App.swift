@@ -3,35 +3,47 @@ import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate(ignoringOtherApps: true)
-        bringMainWindowForward()
+        NSApp.setActivationPolicy(.accessory)
+        let url = Bundle.main.bundleURL
+        if url.path.hasSuffix("ChromaDock.app") {
+            DividerManager.installAppLaunchAgent(appURL: url)
+        }
+        hideMainWindows()
+        DispatchQueue.main.async { [weak self] in
+            self?.hideMainWindows()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            self?.hideMainWindows()
+        }
+        NotificationCenter.default.post(name: .chromaDockDidLaunch, object: nil)
+    }
+
+    fileprivate func hideMainWindows() {
+        for window in NSApp.windows where window.canBecomeMain || window.canBecomeKey {
+            if window.isVisible {
+                window.orderOut(nil)
+            }
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        NSApp.activate(ignoringOtherApps: true)
-        bringMainWindowForward()
-        if NSApp.windows.contains(where: { $0.canBecomeMain && $0.isVisible }) {
+        if flag {
+            NSApp.activate(ignoringOtherApps: true)
             return true
         }
         NotificationCenter.default.post(name: .chromaDockReopen, object: nil)
+        NSApp.activate(ignoringOtherApps: true)
         return true
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
     }
-
-    private func bringMainWindowForward() {
-        let windows = NSApp.windows.filter { $0.canBecomeMain || $0.canBecomeKey }
-        if let match = windows.first(where: { $0.isVisible }) ?? windows.first {
-            match.makeKeyAndOrderFront(nil)
-        }
-    }
 }
 
 extension Notification.Name {
     static let chromaDockReopen = Notification.Name("llc.nextcitizen.ChromaDock.reopen")
+    static let chromaDockDidLaunch = Notification.Name("llc.nextcitizen.ChromaDock.didLaunch")
 }
 
 struct ChromaDockApp: App {
@@ -39,7 +51,7 @@ struct ChromaDockApp: App {
     @StateObject private var model = AppModel()
 
     var body: some Scene {
-        WindowGroup("ChromaDock", id: "main") {
+        Window("ChromaDock", id: "main") {
             ContentView()
                 .environmentObject(model)
         }
@@ -50,9 +62,20 @@ struct ChromaDockApp: App {
             CommandGroup(replacing: .newItem) {}
         }
 
-        MenuBarExtra("ChromaDock", systemImage: "rectangle.split.3x1") {
+        MenuBarExtra {
             MenuBarView()
                 .environmentObject(model)
+                .onAppear {
+                    model.startDividerHelpersIfNeeded()
+                    model.ensureLoginAgent()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .chromaDockDidLaunch)) { _ in
+                    model.startDividerHelpersIfNeeded()
+                    model.ensureLoginAgent()
+                }
+        } label: {
+            Text("CD")
         }
+        .menuBarExtraStyle(.menu)
     }
 }

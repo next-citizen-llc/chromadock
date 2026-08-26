@@ -304,6 +304,7 @@ enum DividerManager {
     }
 
     static let linesLaunchAgentLabel = "llc.nextcitizen.ChromaDock.lines"
+    static let appLaunchAgentLabel = "llc.nextcitizen.ChromaDock"
 
     static func linesLaunchAgentPlist(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
         home.appendingPathComponent("Library/LaunchAgents/\(linesLaunchAgentLabel).plist")
@@ -352,6 +353,49 @@ enum DividerManager {
             _ = try? DockIO.run("/bin/launchctl", ["bootstrap", "gui/\(uid)", plist.path])
         } catch {
             return
+        }
+    }
+
+    static func appLaunchAgentPlist(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
+        home.appendingPathComponent("Library/LaunchAgents/\(appLaunchAgentLabel).plist")
+    }
+
+    static func installAppLaunchAgent(appURL: URL) {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let plist = appLaunchAgentPlist(home: home)
+        let logs = home.appendingPathComponent("Library/Logs/ChromaDock-launchd.log")
+        let agent: [String: Any] = [
+            "Label": appLaunchAgentLabel,
+            "RunAtLoad": true,
+            "KeepAlive": true,
+            "LimitLoadToSessionType": "Aqua",
+            "AssociatedBundleIdentifiers": ["llc.nextcitizen.ChromaDock"],
+            "Program": appURL.appendingPathComponent("Contents/MacOS/ChromaDock").path,
+            "StandardOutPath": logs.path,
+            "StandardErrorPath": logs.path
+        ]
+        do {
+            let data = try PropertyListSerialization.data(fromPropertyList: agent, format: .xml, options: 0)
+            try FileManager.default.createDirectory(at: plist.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let existing = try? Data(contentsOf: plist)
+            try data.write(to: plist)
+            let uid = getuid()
+            if existing != data {
+                _ = try? DockIO.run("/bin/launchctl", ["bootout", "gui/\(uid)/\(appLaunchAgentLabel)"])
+            }
+            _ = try? DockIO.run("/bin/launchctl", ["bootstrap", "gui/\(uid)", plist.path])
+        } catch {
+            return
+        }
+    }
+
+    static func unloadAppLaunchAgent() {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let plist = appLaunchAgentPlist(home: home)
+        let uid = getuid()
+        _ = try? DockIO.run("/bin/launchctl", ["bootout", "gui/\(uid)/\(appLaunchAgentLabel)"])
+        if FileManager.default.fileExists(atPath: plist.path) {
+            try? FileManager.default.removeItem(at: plist)
         }
     }
 
